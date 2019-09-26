@@ -1,0 +1,33 @@
+LittleEndian();
+DisplayFormatHex();
+
+typedef struct {
+	uint32 decompressed_offset;
+	uint32 decompressed_size;
+	uint32 compressed_size;
+	uint32 attribute;
+} section_header_t;
+
+struct {
+	char magic[0x4];
+	char name[0xC];
+	uint64 title_id;
+	uint32 version;
+	ubyte main_thread_priority;
+	ubyte main_thread_core_number;
+	ubyte padding_1;
+	struct {
+		ubyte text_compress : 1;
+		ubyte ro_compress : 1;
+		ubyte data_compress : 1;
+		ubyte is_64_bit_instruction : 1;
+		ubyte address_space_64_bit : 1;
+		ubyte use_system_pool_partition : 1;
+	} flags;
+	section_header_t text;
+	section_header_t ro;
+	section_header_t data;
+	section_header_t bss;
+	ubyte padding_2[0x20];
+	uint32 kernel_capabilities[0x20];
+} kip1_header;
