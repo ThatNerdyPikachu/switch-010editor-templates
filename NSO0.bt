@@ -1,0 +1,71 @@
+LittleEndian();
+DisplayFormatHex();
+
+typedef struct {
+	uint32 file_offset;
+	uint32 memory_offset;
+	uint32 size;
+} section_header_t;
+
+typedef struct {
+	uint32 offset;
+	uint32 size;
+} secondary_section_header_t;
+
+struct {
+	char magic[0x4];
+	uint32 version;
+	uint32 padding_1;
+	struct {
+		ubyte text_compress : 1;
+		ubyte ro_compress : 1;
+		ubyte data_compress : 1;
+		ubyte text_hash : 1;
+		ubyte ro_hash : 1;
+		ubyte data_hash : 1;
+		ubyte unused_1[0x3];
+	} flags;
+	section_header_t text;
+	uint32 module_name_offset;
+	section_header_t ro;
+	uint32 module_name_size;
+	section_header_t data;
+	uint32 bss_size;
+	ubyte module_id[0x20];
+	uint32 text_file_size;
+	uint32 ro_file_size;
+	uint32 data_file_size;
+	ubyte padding_2[0x1C];
+	secondary_section_header_t embeded;
+	secondary_section_header_t dyn_str;
+	secondary_section_header_t dyn_sym;
+	ubyte text_hash[0x20];
+	ubyte ro_hash[0x20];
+	ubyte data_hash[0x20];
+} nso_header;
+
+FSeek(nso_header.module_name_offset);
+if (nso_header.module_name_size != 0) {
+	struct {
+		ubyte module_name_length;
+		char module_name[module_name_length];
+	} module_name;
+};
+
+if (nso_header.flags.text_compress & nso_header.flags.ro_compress & nso_header.flags.data_compress) {
+	FSkip(2);
+};
+
+if (FileNameGetBase(GetFileName(), false) != "rtld") {
+	struct {
+		uint32 padding_1;
+		uint32 magic_offset;
+		char magic[0x4];
+		uint32 dynamic_offset;
+		uint32 bss_start_offset;
+		uint32 bss_end_offset;
+		uint32 eh_frame_hdr_start_offset;
+		uint32 eh_frame_hdr_end_offset;
+		uint32 assembly_offset;
+	} mod_header;
+};
