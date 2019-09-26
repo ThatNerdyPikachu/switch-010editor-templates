@@ -1,0 +1,29 @@
+LittleEndian();
+DisplayFormatHex();
+
+typedef enum <uint32> {
+	TYPE_FOR_SELF,
+	TYPE_FOR_OTHERS
+} module_type_t;
+
+struct {
+    char magic[0x4];
+    ubyte padding_1[0xC];
+    uint64 title_id_mask;
+    uint64 title_id_pattern;
+    ubyte padding_2[0x10];
+    ubyte modulus[0x100];
+    ubyte fixed_key_signature[0x100];
+    ubyte nrr_signature[0x100];
+    uint64 title_id;
+    uint32 nrr_size;
+    module_type_t module_type;
+    uint32 hash_offset;
+    uint32 hash_count;
+    uint64 padding_3;
+} nrr_header;
+
+FSeek(nrr_header.hash_offset);
+struct {
+	ubyte hash[0x20];
+} hashes[nrr_header.hash_count];
