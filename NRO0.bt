@@ -44,7 +44,7 @@ struct {
 	uint32 eh_frame_hdr_start_offset;
 	uint32 eh_frame_hdr_end_offset;
 	uint32 assembly_offset;
-} rocrt_header;
+} mod_header;
 
 typedef struct {
 	uint64 offset;
