@@ -1,0 +1,69 @@
+LittleEndian();
+DisplayFormatHex();
+
+struct {
+	uint32 entrypoint_insn;
+	uint32 mod_offset;
+} rocrt;
+
+typedef struct {
+	uint32 memory_offset;
+	uint32 size;
+} section_header_t;
+
+typedef struct {
+	uint32 offset;
+	uint32 size;
+} secondary_section_header_t;
+
+struct {
+	char padding_1[0x8];
+	char magic[0x4];
+	uint32 version;
+	uint32 size;
+	uint32 flags;
+	section_header_t text;
+	section_header_t ro;
+	section_header_t data;
+	uint32 bss_size;
+	uint32 padding_2;
+	ubyte module_id[0x20];
+	uint32 dso_handle_offset;
+	uint32 padding_3;
+	secondary_section_header_t embeded;
+	secondary_section_header_t dyn_str;
+	secondary_section_header_t dyn_sym;
+} nro_header;
+
+FSeek(rocrt.mod_offset);
+struct {
+	char magic[0x4];
+	uint32 dynamic_offset;
+	uint32 bss_start_offset;
+	uint32 bss_end_offset;
+	uint32 eh_frame_hdr_start_offset;
+	uint32 eh_frame_hdr_end_offset;
+	uint32 assembly_offset;
+} rocrt_header;
+
+typedef struct {
+	uint64 offset;
+	uint64 size;
+} aset_section_header_t;
+
+if (nro_header.padding_1 == "HOMEBREW") {
+	FSeek(nro_header.size);
+	struct {
+		char magic[0x4];
+		uint32 version;
+		aset_section_header_t icon;
+		aset_section_header_t nacp;
+		aset_section_header_t romfs;
+	} aset_header;
+	
+	FSeek(nro_header.size + aset_header.icon.offset);
+	ubyte icon[aset_header.icon.size];
+	
+	FSeek(nro_header.size + aset_header.nacp.offset);
+	ubyte nacp[aset_header.nacp.size];
+}
