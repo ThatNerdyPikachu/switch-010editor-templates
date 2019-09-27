@@ -1,0 +1,200 @@
+LittleEndian();
+DisplayFormatHex();
+
+typedef enum <ubyte> {
+	STARTUP_NONE,
+	STARTUP_REQUIRED,
+	STARTUP_REQUIRED_WITH_NETWORK_SERVICE_ACCOUNT_AVAILABLE
+} startup_user_account_t;
+
+typedef enum <ubyte> {
+	LOCK_DISABLE,
+	LOCK_ENABLE
+} user_account_switch_lock_t;
+
+typedef enum <ubyte> {
+	REGISTRATION_ALL_ON_LAUNCH,
+	REGISTRATION_ON_DEMAND
+} add_on_content_registration_type_t;
+
+typedef enum <uint32> {
+	ATTRIBUTE_NONE,
+	ATTRIBUTE_DEMO,
+	ATTRIBUTE_RETAIL_INTERACTIVE_DISPLAY
+} attribute_flag_t;
+
+typedef enum <uint32> {
+	PARENTAL_NONE,
+	PARENTAL_FREE_COMMUNICATION
+} parental_control_flag_t;
+
+typedef enum <ubyte> {
+	SCREENSHOT_ALLOW,
+	SCREENSHOT_DENY
+} screenshot_t;
+
+typedef enum <ubyte> {
+	CAPTURE_DISABLE,
+	CAPTURE_MANUAL,
+	CAPTURE_ENABLE
+} video_capture_t;
+
+typedef enum <ubyte> {
+	CONFIRMATION_NONE,
+	CONFIRMATION_REQUIRED
+} data_loss_confirmation_t;
+
+typedef enum <ubyte> {
+	POLICY_ALL,
+	POLICY_LOG_ONLY,
+	POLICY_NONE
+} play_log_policy_t;
+
+typedef enum <ubyte> {
+	LOGO_LICENSED_BY_NINTENDO,
+	LOGO_NINTENDO = 0x2
+} logo_type_t;
+
+typedef enum <ubyte> {
+	HANDLING_AUTO,
+	HANDLING_MANUAL
+} logo_handling_t;
+
+typedef enum <ubyte> {
+	INSTALL_DENY,
+	INSTALL_ALLOW_APPEND
+} runtime_add_on_content_install_t;
+
+typedef enum <ubyte> {
+	REPORT_DENY,
+	REPORT_ALLOW
+} crash_report_t;
+
+typedef enum <ubyte> {
+	HDCP_NONE,
+	HDCP_REQUIRED
+} hdcp_t;
+
+typedef enum <ubyte> {
+	OPTION_NONE,
+	OPTION_IS_OPTIONAL
+} startup_user_account_option_t;
+
+typedef enum <ubyte> {
+	CAPABILITY_NONE,
+	CAPABILITY_WHITELIST,
+	CAPABILITY_ALL
+} play_log_query_capability_t;
+
+typedef enum <ubyte> {
+	REPAIR_NONE,
+	REPAIR_SUPPRESS_GAME_CARD_ACCESS
+} repair_flag_t;
+
+typedef enum <ubyte> {
+	LAUNCH_NONE,
+	LAUNCH_COMMON
+} required_network_service_license_on_launch_t;
+
+typedef enum <uint64> {
+	CONFIGURATION_NONE,
+	CONFIGURATION_ENABLED
+} jit_configuration_flag_t;
+
+struct {
+	struct {
+		ubyte name[0x200];
+		ubyte publisher[0x100];
+	} application_title[0x10];
+	char isbn[0x25];
+	startup_user_account_t startup_user_account;
+	user_account_switch_lock_t user_account_switch_lock; // Old: touch_screen_usage (NONE, SUPPORTED, REQUIRED)
+	add_on_content_registration_type_t add_on_content_registration_type;
+	attribute_flag_t attribute_flag;
+	struct {
+		ubyte american_english : 1;
+		ubyte british_english : 1;
+		ubyte japanese : 1;
+		ubyte french : 1;
+		ubyte german : 1;
+		ubyte latin_american_spanish : 1;
+		ubyte spanish : 1;
+		ubyte italian : 1;
+		ubyte dutch : 1;
+		ubyte canadian_french : 1;
+		ubyte portuguese : 1;
+		ubyte russian : 1;
+		ubyte korean : 1;
+		ubyte traditional_chinese : 1;
+		ubyte simplified_chinese : 1;
+		uint16 padding_1;
+	} supported_language_flag;
+	parental_control_flag_t parental_control_flag;
+	screenshot_t screenshot;
+	video_capture_t video_capture;
+	data_loss_confirmation_t data_loss_confirmation;
+	play_log_policy_t play_log_policy;
+	uint64 presence_group_id;
+	struct {
+		ubyte cero;
+		ubyte gracgcrb;
+		ubyte gsrmr;
+		ubyte esrb;
+		ubyte classind;
+		ubyte usk;
+		ubyte pegi;
+		ubyte pegiportugal;
+		ubyte pegibbfc;
+		ubyte russian;
+		ubyte acb;
+		ubyte oflc;
+		ubyte padding_1[0x14];
+	} rating_age;
+	char display_version[0x10];
+	uint64 add_on_content_base_id;
+	uint64 save_data_owner_id;
+	uint64 user_account_save_data_size;
+	uint64 user_account_save_data_journal_size;
+	uint64 device_save_data_size;
+	uint64 device_save_data_journal_size;
+	uint64 bcat_delivery_cache_storage_size;
+	char application_error_code_category[0x8];
+	uint64 local_communication_id[0x8];
+	logo_type_t logo_type;
+	logo_handling_t logo_handling;
+	runtime_add_on_content_install_t runtime_add_on_content_install;
+	ubyte padding_1[0x3];
+	crash_report_t crash_report;
+	hdcp_t hdcp;
+	uint64 seed_for_pseudo_device_id;
+	char bcat_passphrase[0x41];
+	startup_user_account_option_t startup_user_account_option;
+	ubyte padding_2[0x6];
+	uint64 user_account_save_data_size_max;
+	uint64 user_account_save_data_journal_size_max;
+	uint64 device_save_data_size_max;
+	uint64 device_save_data_journal_size_max;
+	uint64 temporary_storage_size;
+	uint64 cache_storage_size;
+	uint64 cache_storage_journal_size;
+	uint64 cache_storage_data_and_journal_size_max;
+	uint16 cache_storage_index_max;
+	ubyte padding_3[0x6];
+	uint64 play_log_queryable_application_id[0x10];
+	play_log_query_capability_t play_log_query_capability;
+	repair_flag_t repair_flag;
+	ubyte program_index;
+	required_network_service_license_on_launch_t required_network_service_license_on_launch;
+	uint32 padding_4;
+	struct {
+		uint64 id;
+		ubyte key[0x10];
+	} send_data_configuration;
+	struct {
+		uint64 id;
+		ubyte key[0x10];
+	} receivable_data_configurations[0x10];
+	jit_configuration_flag_t jit_configuration_flag;
+	uint64 memory_size;
+	ubyte padding_5[0xC40];
+} nacp_header;
