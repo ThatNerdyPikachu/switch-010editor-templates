@@ -12,7 +12,6 @@ typedef struct {
 	uint32 decompressed_offset;
 	uint32 decompressed_size;
 	uint32 compressed_size;
-	uint32 attribute;
 } section_header_t;
 
 struct {
@@ -32,9 +31,12 @@ struct {
 		ubyte use_system_pool_partition : 1;
 	} flags;
 	section_header_t text;
+	uint32 padding_2;
 	section_header_t ro;
+	uint32 main_thread_stack_size;
 	section_header_t data;
+	uint32 padding_3;
 	section_header_t bss;
-	ubyte padding_2[0x20];
+	ubyte padding_4[0x24];
 	uint32 kernel_capabilities[0x20];
 } kip1_header[ini1_header.file_count];
