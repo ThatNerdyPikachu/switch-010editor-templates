@@ -28,7 +28,7 @@ struct {
 	section_header_t ro;
 	uint32 main_thread_stack_size;
 	section_header_t data;
-	ubyte padding_3;
+	uint32 padding_3;
 	section_header_t bss;
 	ubyte padding_4[0x24];
 	uint32 kernel_capabilities[0x20];
