@@ -43,15 +43,21 @@ struct {
 	uint32 bss_end_offset;
 	uint32 eh_frame_hdr_start_offset;
 	uint32 eh_frame_hdr_end_offset;
-	uint32 assembly_offset;
+	uint32 module_object_offset;
 } mod_header;
 
-typedef struct {
-	uint64 offset;
-	uint64 size;
-} aset_section_header_t;
-
 if (nro_header.padding_1 == "HOMEBREW") {
+	struct {
+		char magic[0x4];
+		uint32 got_start_offset;
+		uint32 got_end_offset;
+	} lny_header;
+	
+	typedef struct {
+		uint64 offset;
+		uint64 size;
+	} aset_section_header_t;
+	
 	FSeek(nro_header.size);
 	struct {
 		char magic[0x4];
@@ -66,4 +72,7 @@ if (nro_header.padding_1 == "HOMEBREW") {
 	
 	FSeek(nro_header.size + aset_header.nacp.offset);
 	ubyte nacp[aset_header.nacp.size];
+	
+	FSeek(nro_header.size + aset_header.romfs.offset);
+	ubyte romfs[aset_header.romfs.size];
 }
