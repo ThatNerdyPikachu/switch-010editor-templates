@@ -50,11 +50,11 @@ if (nso_header.module_name_size != 0) {
 		ubyte module_name_length;
 		char module_name[module_name_length];
 	} module_name;
-};
+}
 
 if (nso_header.flags.text_compress & nso_header.flags.ro_compress & nso_header.flags.data_compress) {
-	FSkip(2);
-};
+	FSkip(0x2);
+}
 
 if (FileNameGetBase(GetFileName(), false) != "rtld") {
 	struct {
@@ -66,6 +66,6 @@ if (FileNameGetBase(GetFileName(), false) != "rtld") {
 		uint32 bss_end_offset;
 		uint32 eh_frame_hdr_start_offset;
 		uint32 eh_frame_hdr_end_offset;
-		uint32 assembly_offset;
+		uint32 module_object_offset;
 	} mod_header;
-};
+}
