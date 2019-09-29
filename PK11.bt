@@ -1,0 +1,36 @@
+LittleEndian();
+DisplayFormatHex();
+
+struct {
+	uint32 package1loader_hash;
+	uint32 secure_monitor_hash;
+	uint32 nx_bootloader_hash;
+	uint32 build_id;
+	char build_timestamp[0xE];
+	ubyte padding_1;
+	ubyte version;
+} package1loader_header;
+
+FSeek(0x3FE0);
+struct {
+	uint32 size;
+	ubyte padding_1[0xC];
+	ubyte ctr[0x10];
+} pk11_encryption;
+
+typedef struct {
+	uint32 size;
+	uint32 offset;
+} section_header_t;
+
+struct {
+	char magic[0x4];
+	if (magic != "PK11") {
+		Warning("File is not decrypted.");
+		Exit(-1);
+	}
+	section_header_t section_0;
+	uint32 padding_1;
+	section_header_t section_1;
+	section_header_t section_2;
+} pk11_header;
