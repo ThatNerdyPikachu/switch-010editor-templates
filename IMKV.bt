@@ -1,0 +1,98 @@
+LittleEndian();
+DisplayFormatHex();
+
+struct {
+	char magic[0x4];
+	uint32 padding_1;
+	uint32 entry_count;
+} imkv;
+
+typedef enum <ubyte> {
+	SystemProgram = 0x1,
+	SystemData,
+	SystemUpdate,
+	BootImagePackage,
+	BootImagePackageSafe,
+	Application = 0x80,
+	Patch,
+	AddOnContent,
+	Delta
+} content_meta_type_t;
+
+typedef enum <ubyte> {
+	Meta,
+	Program,
+	Data,
+	Control,
+	HtmlDocument,
+	LegalInformation,
+	DeltaFragment
+} content_type_t;
+
+typedef enum <ubyte> {
+	Full,
+	FragmentOnly
+} content_install_type_t;
+
+typedef struct {
+	ubyte IncludesExFatDriver : 1;
+	ubyte Rebootless : 1;
+} content_meta_attribute_t;
+
+typedef enum <ubyte> {
+	System,
+	User,
+	SdCard
+} content_storage_id_t;
+
+typedef struct {
+	ubyte content_id[0x10];
+	uint32 size_low;
+	uint16 size_high;
+	content_type_t content_type;
+	ubyte id_offset;
+} content_record_t;
+
+typedef struct {
+	uint64 title_id;
+	uint32 version;
+	content_meta_type_t content_meta_type;
+	content_meta_attribute_t content_meta_attribute;
+	uint16 padding_1;
+} content_meta_record_t;
+
+typedef struct {
+	uint64 title_id;
+	uint32 version;
+	content_meta_type_t content_meta_type;
+	content_install_type_t content_install_type;
+	uint16 padding_1;
+} key_t;
+
+typedef struct {
+	uint16 extended_header_size;
+	uint16 content_count;
+	uint16 content_meta_count;
+	content_meta_attribute_t content_meta_attribute;
+	content_storage_id_t content_storage_id;
+	if (extended_header_size == 0x4) {
+		uint32 extended_data_size;
+	} else {
+		local uint32 extended_data_size = 0;
+	}
+	if (content_count > 0) {
+		content_record_t content_record[content_count];
+	}
+	if (content_meta_count > 0) {
+		content_meta_record_t content_meta_record[content_meta_count];
+	}
+	ubyte extended_data[extended_data_size]; // Unknown data
+} value_t;
+
+struct {
+	char magic[0x4];
+	uint32 key_size;
+	uint32 value_size;
+	key_t key;
+	value_t value;
+} imen[imkv.entry_count] <optimize=false>;
