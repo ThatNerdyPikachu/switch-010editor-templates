@@ -23,6 +23,25 @@ typedef enum <uint32> {
 	ATTRIBUTE_RETAIL_INTERACTIVE_DISPLAY
 } attribute_flag_t;
 
+typedef struct {
+	ubyte american_english : 1;
+	ubyte british_english : 1;
+	ubyte japanese : 1;
+	ubyte french : 1;
+	ubyte german : 1;
+	ubyte latin_american_spanish : 1;
+	ubyte spanish : 1;
+	ubyte italian : 1;
+	ubyte dutch : 1;
+	ubyte canadian_french : 1;
+	ubyte portuguese : 1;
+	ubyte russian : 1;
+	ubyte korean : 1;
+	ubyte traditional_chinese : 1;
+	ubyte simplified_chinese : 1;
+	uint16 padding_1;
+} supported_language_flag_t;
+
 typedef enum <uint32> {
 	PARENTAL_NONE,
 	PARENTAL_FREE_COMMUNICATION
@@ -111,24 +130,7 @@ struct {
 	user_account_switch_lock_t user_account_switch_lock; // Old: touch_screen_usage (NONE, SUPPORTED, REQUIRED)
 	add_on_content_registration_type_t add_on_content_registration_type;
 	attribute_flag_t attribute_flag;
-	struct {
-		ubyte american_english : 1;
-		ubyte british_english : 1;
-		ubyte japanese : 1;
-		ubyte french : 1;
-		ubyte german : 1;
-		ubyte latin_american_spanish : 1;
-		ubyte spanish : 1;
-		ubyte italian : 1;
-		ubyte dutch : 1;
-		ubyte canadian_french : 1;
-		ubyte portuguese : 1;
-		ubyte russian : 1;
-		ubyte korean : 1;
-		ubyte traditional_chinese : 1;
-		ubyte simplified_chinese : 1;
-		uint16 padding_1;
-	} supported_language_flag;
+	supported_language_flag_t supported_language_flag;
 	parental_control_flag_t parental_control_flag;
 	screenshot_t screenshot;
 	video_capture_t video_capture;
@@ -194,7 +196,9 @@ struct {
 		uint64 id;
 		ubyte key[0x10];
 	} receivable_data_configurations[0x10];
-	jit_configuration_flag_t jit_configuration_flag;
-	uint64 memory_size;
+	struct {
+		jit_configuration_flag_t jit_configuration_flag;
+		uint64 memory_size;
+	} jit_configuration;
 	ubyte padding_5[0xC40];
-} nacp_header;
+} nacp;
