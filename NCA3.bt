@@ -7,13 +7,12 @@ typedef enum <ubyte> {
 } distribution_type_t;
 
 typedef enum <ubyte> {
-	TYPE_PROGRAM,
-	TYPE_META,
-	TYPE_CONTROL,
-	TYPE_MANUAL,
-	TYPE_DATA,
-	TYPE_PUBLIC_DATA,
-	TYPE_INVALID = 0xFF
+	CONTENT_PROGRAM,
+	CONTENT_META,
+	CONTENT_CONTROL,
+	CONTENT_MANUAL,
+	CONTENT_DATA,
+	CONTENT_PUBLIC_DATA,
 } content_type_t;
 
 typedef enum <ubyte> {
@@ -47,8 +46,8 @@ struct {
 	ubyte padding_1[0xF];
 	ubyte rights_id[0x10];
 	struct {
-		uint32 start_offset; // * 512
-		uint32 end_offset; // * 512
+		uint32 start_offset; // start_offset * 0x200, offset >> 1
+		uint32 end_offset; // end_offset * 0x200, offset >> 1
 		entry_flag_t entry_flag;
 		uint32 padding_1;
 	} fs_entries[4];
@@ -101,7 +100,7 @@ typedef struct {
 		uint32 block_size; // 1 << block_size
 		uint32 padding_1;
 	} levels[level_count];
-	ubyte padding_1[0x8];
+	uint64 padding_1;
 	ubyte master_hash[0x20];
 } hierarchical_integrity_t;
 
@@ -110,19 +109,19 @@ typedef struct {
 	uint32 version;
 	uint32 entry_count;
 	uint32 padding_1;
-} patch_info_t;
+} bucket_tree_header_t;
 
 typedef struct {
 	uint64 indirect_offset;
 	uint64 indirect_size;
-	patch_info_t patch_info;
-} patch_info_indirect_header_t;
+	bucket_tree_header_t bucket_tree_header;
+} indirect_header_t;
 
 typedef struct {
 	uint64 aes_ctr_ex_offset;
 	uint64 aes_ctr_ex_size;
-	patch_info_t patch_info;
-} patch_info_aes_ctr_ex_header_t;
+	bucket_tree_header_t bucket_tree_header;
+} aes_ctr_ex_header_t;
 
 struct {
 	uint16 version;
@@ -137,8 +136,8 @@ struct {
 		hierarchical_integrity_t hierarchical_integrity;
 		if (encryption_type == ENCRYPTION_AES_CTR_EX) {
 			ubyte padding_2[0x18];
-			patch_info_indirect_header_t patch_info_indirect_header;
-			patch_info_aes_ctr_ex_header_t patch_info_aes_ctr_ex_header;
+			indirect_header_t indirect_header;
+			aes_ctr_ex_header_t aes_ctr_ex_header;
 		} else {
 			ubyte padding_2[0x58];
 		}
@@ -168,12 +167,12 @@ typedef struct {
 	uint64 header_size;
 	uint64 directory_hash_table_offset;
 	uint64 directory_hash_table_size;
-	uint64 directory_entry_table_offset;
-	uint64 directory_entry_table_size;
+	uint64 directory_meta_table_offset;
+	uint64 directory_meta_table_size;
 	uint64 file_hash_table_offset;
 	uint64 file_hash_table_size;
-	uint64 file_entry_table_offset;
-	uint64 file_entry_table_size;
+	uint64 file_meta_table_offset;
+	uint64 file_meta_table_size;
 	uint64 data_offset;
 } romfs_header_t;
 
@@ -186,7 +185,7 @@ typedef struct {
 	uint32 name_length; // 0x300 limit
 	char name[name_length];
 	ubyte padding_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
-} romfs_directory_entry_t;
+} romfs_directory_meta_t;
 
 typedef struct {
 	uint32 parent_offset;
@@ -197,36 +196,86 @@ typedef struct {
 	uint32 name_length; // 0x300 limit
 	char name[name_length];
 	ubyte padding_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
-} romfs_file_entry_t;
+} romfs_file_meta_t;
+
+typedef enum {
+	INDEX_ORIGINAL,
+	INDEX_PATCH
+} indirect_storage_index_t;
+
+typedef struct {
+    uint64 virtual_offset;
+    uint64 physical_offset;
+    indirect_storage_index_t indirect_storage_index;
+} indirect_storage_entry_t;
+
+typedef struct { 
+	uint32 index;
+	uint32 entry_count;
+	uint64 virtual_offset_end;
+	indirect_storage_entry_t indirect_storage_entries[0x3FF0 / 0x14];
+	ubyte padding_2[0x3FF0 % 0x14];
+} indirect_storage_bucket_t;
+
+typedef struct {
+	uint32 index;
+	uint32 bucket_count;
+	uint64 total_size;
+	uint64 virtual_offsets[0x3FF0 / 0x8];
+	indirect_storage_bucket_t indirect_storage_bucket[bucket_count];
+} indirect_storage_block_t;
+
+typedef struct {
+	uint64 offset;
+	uint32 generation;
+	uint32 secure_value;
+} aes_ctr_ex_storage_entry_t;
+
+typedef struct {
+	uint32 index;
+	uint32 entry_count;
+	uint64 physical_offset_end;
+	aes_ctr_ex_storage_entry_t aes_ctr_ex_storage_entry[0x3FF];
+} aes_ctr_ex_storage_bucket_t;
+
+typedef struct {
+	uint32 index;
+	uint32 bucket_count;
+	uint64 total_size;
+	uint64 physical_offsets[0x3FF0 / 0x8];
+	aes_ctr_ex_storage_bucket_t aes_ctr_ex_storage_bucket[bucket_count];
+} aes_ctr_ex_storage_block_t;
 
 local uint64 romfs_header_offset, pfs0_header_offset = 0;
-local uint32 i, romfs_directory_hash_count, romfs_file_hash_count = 0;
+local uint32 i;
 for (i = 0; i < 4; i++) {
 	if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].hash_type == HASH_HIERARCHICAL_INTEGRITY && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
 		romfs_header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_integrity.levels[5].hash_data_offset;
 		FSeek(romfs_header_offset);
 		romfs_header_t romfs_header;
-		romfs_directory_hash_count = romfs_header.directory_hash_table_size / 4;
 		FSeek(romfs_header_offset + romfs_header.directory_hash_table_offset);
-		uint32 romfs_directory_hash[romfs_directory_hash_count];
-		FSeek(romfs_header_offset + romfs_header.directory_entry_table_offset);
+		uint32 romfs_directory_hash[romfs_header.directory_hash_table_size / 4];
+		FSeek(romfs_header_offset + romfs_header.directory_meta_table_offset);
 		struct {
-			while (FTell() < romfs_header_offset + romfs_header.directory_entry_table_offset + romfs_header.directory_entry_table_size) {
-				romfs_directory_entry_t romfs_directory_entry;
+			while (FTell() < romfs_header_offset + romfs_header.directory_meta_table_offset + romfs_header.directory_meta_table_size) {
+				romfs_directory_meta_t romfs_directory_meta;
 			}
-		} romfs_directory_entry_table;
-		romfs_file_hash_count = romfs_header.file_hash_table_size / 4;
+		} romfs_directory_meta_table;
 		FSeek(romfs_header_offset + romfs_header.file_hash_table_offset);
-		uint32 romfs_file_hash[romfs_file_hash_count];
-		FSeek(romfs_header_offset + romfs_header.file_entry_table_offset);
+		uint32 romfs_file_hash[romfs_header.file_hash_table_size / 4];
+		FSeek(romfs_header_offset + romfs_header.file_meta_table_offset);
 		struct {
-			while (FTell() < romfs_header_offset + romfs_header.file_entry_table_offset + romfs_header.file_entry_table_size) {
-				romfs_file_entry_t romfs_file_entry;
+			while (FTell() < romfs_header_offset + romfs_header.file_meta_table_offset + romfs_header.file_meta_table_size) {
+				romfs_file_meta_t romfs_file_meta;
 			}
-		} romfs_file_entry_table;
+		} romfs_file_meta_table;
 	} else if (nca_fs_header[i].format_type == FORMAT_PFS0 && nca_fs_header[i].hash_type == HASH_HIERARCHICAL_SHA256 && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
 		pfs0_header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
 		FSeek(pfs0_header_offset);
 		pfs0_header_t pfs0_header;
+	} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].hash_type == HASH_HIERARCHICAL_INTEGRITY && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
+		FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].indirect_header.indirect_offset);
+		indirect_storage_block_t indirect_storage_block;
+		aes_ctr_ex_storage_block_t aes_ctr_ex_storage_block;
 	}
 }
