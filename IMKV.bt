@@ -1,49 +1,54 @@
 LittleEndian();
 DisplayFormatHex();
 
+local uint32 extended_data_size = 0;
+
 struct {
 	char magic[0x4];
 	uint32 padding_1;
 	uint32 entry_count;
-} imkv;
+} kvdb_header;
 
 typedef enum <ubyte> {
-	SystemProgram = 0x1,
-	SystemData,
-	SystemUpdate,
-	BootImagePackage,
-	BootImagePackageSafe,
-	Application = 0x80,
-	Patch,
-	AddOnContent,
-	Delta
-} content_meta_type_t;
-
-typedef enum <ubyte> {
-	Meta,
-	Program,
-	Data,
-	Control,
-	HtmlDocument,
-	LegalInformation,
-	DeltaFragment
+	CONTENT_META,
+	CONTENT_PROGRAM,
+	CONTENT_DATA,
+	CONTENT_CONTROL,
+	CONTENT_HTML_DOCUMENT,
+	CONTENT_LEGAL_INFORMATION,
+	CONTENT_DELTA_FRAGMENT
 } content_type_t;
 
 typedef enum <ubyte> {
-	Full,
-	FragmentOnly
-} content_install_type_t;
+	META_SYSTEM_PROGRAM = 0x1,
+	META_SYSTEM_DATA,
+	META_SYSTEM_UPDATE,
+	META_BOOT_IMAGE_PACKAGE,
+	META_BOOT_IMAGE_PACKAGE_SAFE,
+	META_APPLICATION = 0x80,
+	META_PATCH,
+	META_ADD_ON_CONTENT,
+	META_DELTA
+} content_meta_type_t;
 
 typedef struct {
-	ubyte IncludesExFatDriver : 1;
-	ubyte Rebootless : 1;
+	ubyte ATTRIBUTE_INCLUDEX_EX_FAT_DRIVER : 1;
+	ubyte ATTRIBUTE_REBOOTLESS : 1;
 } content_meta_attribute_t;
 
 typedef enum <ubyte> {
-	System,
-	User,
-	SdCard
-} content_storage_id_t;
+	INSTALL_FULL,
+	INSTALL_FRAGMENT_ONLY
+} content_install_type_t;
+
+typedef enum <ubyte> {
+	STORAGE_NONE,
+	STORAGE_HOST,
+	STORAGE_GAME_CARD,
+	STORAGE_NAND_SYSTEM,
+	STORAGE_NAND_USER,
+	STORAGE_SD_CARD
+} storage_id_t;
 
 typedef struct {
 	ubyte content_id[0x10];
@@ -74,11 +79,32 @@ typedef struct {
 	uint16 content_count;
 	uint16 content_meta_count;
 	content_meta_attribute_t content_meta_attribute;
-	content_storage_id_t content_storage_id;
-	if (extended_header_size == 0x4) {
-		uint32 extended_data_size;
-	} else {
-		local uint32 extended_data_size = 0;
+	storage_id_t storage_id;
+	switch (key.content_meta_type) {
+		case META_SYSTEM_UPDATE:
+			uint32 extended_data_size;
+			break;
+		case META_APPLICATION:
+			uint64 patch_id;
+			uint32 required_system_version;
+			uint32 padding_1;
+			break;
+		case META_PATCH:
+			uint64 application_id;
+			uint32 required_system_version;
+			uint32 extended_data_size;
+			uint64 padding_1;
+			break;
+		case META_ADD_ON_CONTENT:
+			uint64 application_id;
+			uint32 required_application_version;
+			uint32 padding_1;
+			break;
+		case META_DELTA:
+			uint64 application_id;
+			uint32 extended_data_size;
+			uint32 padding_1;
+			break;
 	}
 	if (content_count > 0) {
 		content_record_t content_record[content_count];
@@ -86,7 +112,9 @@ typedef struct {
 	if (content_meta_count > 0) {
 		content_meta_record_t content_meta_record[content_meta_count];
 	}
-	ubyte extended_data[extended_data_size]; // Unknown data
+	if (extended_data_size > 0) {
+		ubyte extended_data[extended_data_size];
+	}
 } value_t;
 
 struct {
@@ -95,4 +123,4 @@ struct {
 	uint32 value_size;
 	key_t key;
 	value_t value;
-} imen[imkv.entry_count] <optimize=false>;
+} kvdb_entry[kvdb_header.entry_count] <optimize=false>;
