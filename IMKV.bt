@@ -52,7 +52,8 @@ typedef enum <ubyte> {
 
 typedef struct {
 	ubyte content_id[0x10];
-	ubyte size[0x6];
+	uint32 size_low;
+	uint16 size_high;
 	content_type_t content_type;
 	ubyte id_offset;
 } content_info_t;
@@ -116,10 +117,55 @@ typedef struct {
 	}
 } content_meta_value_t;
 
+typedef enum <ubyte> {
+	TYPE_SYSTEM_SAVE_DATA,
+	TYPE_SAVE_DATA,
+	TYPE_BCAT_DELIVERY_CACHE_STORAGE,
+	TYPE_DEVICE_SAVE_DATA,
+	TYPE_TEMPORARY_STORAGE,
+	TYPE_CACHE_STORAGE,
+	TYPE_BCAT_SYSTEM_STORAGE
+} save_data_type_t;
+
+typedef enum <ubyte> {
+	RANK_PRIMARY,
+	RANK_SECONDARY
+} save_data_rank_t;
+
+typedef enum <ubyte> {
+	SPACE_NAND_SYSTEM,
+	SPACE_NAND_USER,
+	SPACE_SD_CARD,
+	SPACE_TEMPORARY_STORAGE
+} save_data_space_id_t;
+
+typedef struct {
+	uint64 title_id;
+	ubyte user_id[0x10];
+	uint64 save_id;
+	save_data_type_t save_data_type;
+	save_data_rank_t save_data_rank;
+	uint16 index;
+	ubyte padding_1[0x1C];
+} save_data_key_t;
+
+typedef struct {
+	uint64 save_id;
+	uint64 size;
+	uint64 padding_1;
+	save_data_space_id_t save_data_space_id;
+	ubyte padding_2[0x27];
+} save_data_value_t;
+
 struct {
 	char magic[0x4];
 	uint32 key_size;
 	uint32 value_size;
-	content_meta_key_t key;
-	content_meta_value_t value;
+	if (key_size == 0x10) {
+		content_meta_key_t key;
+		content_meta_value_t value;
+	} else if (key_size == 0x40) {
+		save_data_key_t key;
+		save_data_value_t value;
+	}
 } kvdb_entry[kvdb_header.entry_count] <optimize=false>;
