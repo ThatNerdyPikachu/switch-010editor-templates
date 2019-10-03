@@ -1,5 +1,14 @@
 LittleEndian();
 DisplayFormatHex();
+	
+typedef struct {
+	ubyte FLAG_TEXT_COMPRESS : 1;
+	ubyte FLAG_RO_COMPRESS : 1;
+	ubyte FLAG_DATA_COMPRESS : 1;
+	ubyte FLAG_IS_64_BIT_INSTRUCTION : 1;
+	ubyte FLAG_ADDRESS_SPACE_64_BIT : 1;
+	ubyte FLAG_USE_SYSTEM_POOL_PARTITION : 1;
+} flags_t;
 
 typedef struct {
 	uint32 decompressed_offset;
@@ -15,14 +24,7 @@ struct {
 	ubyte main_thread_priority;
 	ubyte main_thread_core_number;
 	ubyte padding_1;
-	struct {
-		ubyte text_compress : 1;
-		ubyte ro_compress : 1;
-		ubyte data_compress : 1;
-		ubyte is_64_bit_instruction : 1;
-		ubyte address_space_64_bit : 1;
-		ubyte use_system_pool_partition : 1;
-	} flags;
+	flags_t flags;
 	section_header_t text;
 	uint32 padding_2;
 	section_header_t ro;
