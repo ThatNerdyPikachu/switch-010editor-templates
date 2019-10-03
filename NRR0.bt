@@ -2,8 +2,8 @@ LittleEndian();
 DisplayFormatHex();
 
 typedef enum <uint32> {
-	TYPE_FOR_SELF,
-	TYPE_FOR_OTHERS
+	MODULE_FOR_SELF,
+	MODULE_FOR_OTHERS
 } module_type_t;
 
 struct {
@@ -21,9 +21,9 @@ struct {
     uint32 hash_offset;
     uint32 hash_count;
     uint64 padding_3;
-} nrr_header;
+} nrr0_header;
 
-FSeek(nrr_header.hash_offset);
+FSeek(nrr0_header.hash_offset);
 struct {
 	ubyte hash[0x20];
-} hashes[nrr_header.hash_count];
+} hashes[nrr0_header.hash_count];
