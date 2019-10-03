@@ -7,11 +7,10 @@ struct {
 	uint32 nx_bootloader_hash;
 	uint32 build_id;
 	char build_timestamp[0xE];
-	ubyte padding_1;
-	ubyte version;
+	uint16 version;
 } package1loader_header;
 
-FSeek(0x3FE0);
+FSeek(0x3FE0); // Offset may be different for newer package1
 struct {
 	uint32 size;
 	ubyte padding_1[0xC];
@@ -29,8 +28,8 @@ struct {
 		Warning("File is not decrypted.");
 		Exit(-1);
 	}
-	section_header_t section_0;
+	section_header_t section_0; // 1.0.0: Secure Monitor, 2.0.0+: Warmboot
 	uint32 padding_1;
-	section_header_t section_1;
-	section_header_t section_2;
+	section_header_t section_1; // NX Bootloader
+	section_header_t section_2; // 1.0.0: Warmboot, 2.0.0+: Secure Monitor
 } pk11_header;
