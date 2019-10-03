@@ -1,0 +1,18 @@
+// Parses FirmwareDebugSettings, PlatformConfigIcosa, PlatformConfigCopper, PlatformConfigHoag, PlatformConfigIcosaMariko and PlatformConfigCalcio files.
+LittleEndian();
+DisplayFormatHex();
+
+uint32 file_size;
+do {
+	struct {
+		uint32 name_length;
+		ubyte name[name_length];
+		ubyte value_type; // 1 = string, 2 = uint8, 3 = uint32
+		uint32 value_size;
+		if (value_type == 1) {
+			char value[value_size];
+		} else {
+			ubyte value[value_size];
+		}
+	} setting_entry;
+} while (FTell() < file_size);
