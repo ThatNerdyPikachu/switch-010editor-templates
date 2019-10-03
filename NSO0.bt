@@ -2,6 +2,16 @@ LittleEndian();
 DisplayFormatHex();
 
 typedef struct {
+	ubyte FLAG_TEXT_COMPRESS : 1;
+	ubyte FLAG_RO_COMPRESS : 1;
+	ubyte FLAG_DATA_COMPRESS : 1;
+	ubyte FLAG_TEXT_HASH : 1;
+	ubyte FLAG_RO_HASH : 1;
+	ubyte FLAG_DATA_HASH : 1;
+	ubyte padding_1[0x3];
+} flags_t;
+
+typedef struct {
 	uint32 file_offset;
 	uint32 memory_offset;
 	uint32 size;
@@ -16,15 +26,7 @@ struct {
 	char magic[0x4];
 	uint32 version;
 	uint32 padding_1;
-	struct {
-		ubyte text_compress : 1;
-		ubyte ro_compress : 1;
-		ubyte data_compress : 1;
-		ubyte text_hash : 1;
-		ubyte ro_hash : 1;
-		ubyte data_hash : 1;
-		ubyte unused_1[0x3];
-	} flags;
+	flags_t flags;
 	section_header_t text;
 	uint32 module_name_offset;
 	section_header_t ro;
@@ -36,36 +38,70 @@ struct {
 	uint32 ro_file_size;
 	uint32 data_file_size;
 	ubyte padding_2[0x1C];
-	secondary_section_header_t embeded;
+	secondary_section_header_t embedded; // api_info
 	secondary_section_header_t dyn_str;
 	secondary_section_header_t dyn_sym;
 	ubyte text_hash[0x20];
 	ubyte ro_hash[0x20];
 	ubyte data_hash[0x20];
-} nso_header;
+} nso0_header;
 
-FSeek(nso_header.module_name_offset);
-if (nso_header.module_name_size != 0) {
+typedef struct {
+	uint32 entrypoint_isbn;
+	uint32 mod0_offset;
+	if (entrypoint_isbn != 0) {
+		char magic[0x8];
+	}
+} rocrt_t;
+
+typedef struct {
+	char magic[0x4];
+	uint32 dynamic_offset;
+	uint32 bss_start_offset;
+	uint32 bss_end_offset;
+	uint32 eh_frame_hdr_start_offset;
+	uint32 eh_frame_hdr_end_offset;
+	uint32 module_object_offset;
+} mod0_header_t;
+
+if (nso0_header.module_name_offset == 0x100 && nso0_header.module_name_size > 0) {
+	FSeek(nso0_header.module_name_offset);
 	struct {
 		ubyte module_name_length;
 		char module_name[module_name_length];
 	} module_name;
-}
 
-if (nso_header.flags.text_compress & nso_header.flags.ro_compress & nso_header.flags.data_compress) {
-	FSkip(0x2);
-}
-
-if (FileNameGetBase(GetFileName(), false) != "rtld") {
-	struct {
-		uint32 padding_1;
-		uint32 magic_offset;
-		char magic[0x4];
-		uint32 dynamic_offset;
-		uint32 bss_start_offset;
-		uint32 bss_end_offset;
-		uint32 eh_frame_hdr_start_offset;
-		uint32 eh_frame_hdr_end_offset;
-		uint32 module_object_offset;
-	} mod_header;
+	if (nso0_header.flags.FLAG_TEXT_COMPRESS & nso0_header.flags.FLAG_RO_COMPRESS & nso0_header.flags.FLAG_DATA_COMPRESS) {
+		FSkip(0x2);
+	}
+	
+	if (FileNameGetBase(GetFileName(), false) != "rtld") {
+		rocrt_t rocrt;
+		mod0_header_t mod0_header;
+	}
+} else {
+	if (!nso0_header.flags.FLAG_TEXT_COMPRESS & !nso0_header.flags.FLAG_RO_COMPRESS & !nso0_header.flags.FLAG_DATA_COMPRESS) {
+		rocrt_t rocrt;
+		
+		if (FileNameGetBase(GetFileName(), false) != "rtld") {
+			FSeek(0x100 + rocrt.mod0_offset);
+			mod0_header_t mod0_header;
+		}
+	} else {
+		FSkip(0x2);
+		rocrt_t rocrt;
+		
+		if (FileNameGetBase(GetFileName(), false) != "rtld") {
+			FSeek(0x1C8);
+			mod0_header_t mod0_header;
+		}
+	}
+	
+	if (rocrt.entrypoint_isbn != 0) {
+		struct {
+			char magic[0x4];
+			uint32 got_start_offset;
+			uint32 got_end_offset;
+		} lny0_header;
+	}
 }
