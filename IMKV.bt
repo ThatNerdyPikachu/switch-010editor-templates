@@ -52,11 +52,10 @@ typedef enum <ubyte> {
 
 typedef struct {
 	ubyte content_id[0x10];
-	uint32 size_low;
-	uint16 size_high;
+	ubyte size[0x6];
 	content_type_t content_type;
 	ubyte id_offset;
-} content_record_t;
+} content_info_t;
 
 typedef struct {
 	uint64 title_id;
@@ -64,7 +63,7 @@ typedef struct {
 	content_meta_type_t content_meta_type;
 	content_meta_attribute_t content_meta_attribute;
 	uint16 padding_1;
-} content_meta_record_t;
+} content_meta_info_t;
 
 typedef struct {
 	uint64 title_id;
@@ -72,7 +71,7 @@ typedef struct {
 	content_meta_type_t content_meta_type;
 	content_install_type_t content_install_type;
 	uint16 padding_1;
-} key_t;
+} content_meta_key_t;
 
 typedef struct {
 	uint16 extended_header_size;
@@ -107,20 +106,20 @@ typedef struct {
 			break;
 	}
 	if (content_count > 0) {
-		content_record_t content_record[content_count];
+		content_info_t content_info[content_count];
 	}
 	if (content_meta_count > 0) {
-		content_meta_record_t content_meta_record[content_meta_count];
+		content_meta_info_t content_meta_info[content_meta_count];
 	}
 	if (extended_data_size > 0) {
 		ubyte extended_data[extended_data_size];
 	}
-} value_t;
+} content_meta_value_t;
 
 struct {
 	char magic[0x4];
 	uint32 key_size;
 	uint32 value_size;
-	key_t key;
-	value_t value;
+	content_meta_key_t key;
+	content_meta_value_t value;
 } kvdb_entry[kvdb_header.entry_count] <optimize=false>;
