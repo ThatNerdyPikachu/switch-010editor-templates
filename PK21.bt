@@ -5,7 +5,7 @@ struct {
 	ubyte signature[0x100];
 	ubyte header_ctr[0x10];
 	struct {
-		ubyte ctr[0x10];
+		ubyte section_ctr[0x10];
 	} section_ctrs[4];
 	char magic[0x4];
 	if (magic != "PK21") {
@@ -18,12 +18,12 @@ struct {
 	ubyte version_min;
 	uint16 padding_2;
 	struct {
-		ubyte size[0x4];
+		ubyte section_size[0x4];
 	} section_sizes[4];
 	struct {
-		ubyte offset[0x4];
+		ubyte section_offset[0x4];
 	} section_offsets[4];
 	struct {
-		ubyte hash[0x20];
+		ubyte section_hash[0x20];
 	} section_hashes[4];
 } pk21_header;
