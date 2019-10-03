@@ -3,7 +3,7 @@ DisplayFormatHex();
 
 struct {
 	uint32 entrypoint_insn;
-	uint32 mod_offset;
+	uint32 mod0_offset;
 } rocrt;
 
 typedef struct {
@@ -30,12 +30,12 @@ struct {
 	ubyte module_id[0x20];
 	uint32 dso_handle_offset;
 	uint32 padding_3;
-	secondary_section_header_t embeded;
+	secondary_section_header_t embedded; // api_info
 	secondary_section_header_t dyn_str;
 	secondary_section_header_t dyn_sym;
-} nro_header;
+} nro0_header;
 
-FSeek(rocrt.mod_offset);
+FSeek(rocrt.mod0_offset);
 struct {
 	char magic[0x4];
 	uint32 dynamic_offset;
@@ -44,21 +44,21 @@ struct {
 	uint32 eh_frame_hdr_start_offset;
 	uint32 eh_frame_hdr_end_offset;
 	uint32 module_object_offset;
-} mod_header;
+} mod0_header;
 
-if (nro_header.padding_1 == "HOMEBREW") {
+if (nro0_header.padding_1 == "HOMEBREW") {
 	struct {
 		char magic[0x4];
 		uint32 got_start_offset;
 		uint32 got_end_offset;
-	} lny_header;
+	} lny0_header;
 	
 	typedef struct {
 		uint64 offset;
 		uint64 size;
 	} aset_section_header_t;
 	
-	FSeek(nro_header.size);
+	FSeek(nro0_header.size);
 	struct {
 		char magic[0x4];
 		uint32 version;
@@ -67,12 +67,12 @@ if (nro_header.padding_1 == "HOMEBREW") {
 		aset_section_header_t romfs;
 	} aset_header;
 	
-	FSeek(nro_header.size + aset_header.icon.offset);
+	FSeek(nro0_header.size + aset_header.icon.offset);
 	ubyte icon[aset_header.icon.size];
 	
-	FSeek(nro_header.size + aset_header.nacp.offset);
+	FSeek(nro0_header.size + aset_header.nacp.offset);
 	ubyte nacp[aset_header.nacp.size];
 	
-	FSeek(nro_header.size + aset_header.romfs.offset);
+	FSeek(nro0_header.size + aset_header.romfs.offset);
 	ubyte romfs[aset_header.romfs.size];
 }
