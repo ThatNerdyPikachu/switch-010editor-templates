@@ -80,31 +80,33 @@ typedef struct {
 	uint16 content_meta_count;
 	content_meta_attribute_t content_meta_attribute;
 	storage_id_t storage_id;
-	switch (key.content_meta_type) {
-		case META_SYSTEM_UPDATE:
-			uint32 extended_data_size;
-			break;
-		case META_APPLICATION:
-			uint64 patch_id;
-			uint32 required_system_version;
-			uint32 padding_1;
-			break;
-		case META_PATCH:
-			uint64 application_id;
-			uint32 required_system_version;
-			uint32 extended_data_size;
-			uint64 padding_1;
-			break;
-		case META_ADD_ON_CONTENT:
-			uint64 application_id;
-			uint32 required_application_version;
-			uint32 padding_1;
-			break;
-		case META_DELTA:
-			uint64 application_id;
-			uint32 extended_data_size;
-			uint32 padding_1;
-			break;
+	if (extended_header_size > 0) {
+		switch (key.content_meta_type) {
+			case META_SYSTEM_UPDATE:
+				uint32 extended_data_size;
+				break;
+			case META_APPLICATION:
+				uint64 patch_id;
+				uint32 required_system_version;
+				uint32 padding_1;
+				break;
+			case META_PATCH:
+				uint64 application_id;
+				uint32 required_system_version;
+				uint32 extended_data_size;
+				uint64 padding_1;
+				break;
+			case META_ADD_ON_CONTENT:
+				uint64 application_id;
+				uint32 required_application_version;
+				uint32 padding_1;
+				break;
+			case META_DELTA:
+				uint64 application_id;
+				uint32 extended_data_size;
+				uint32 padding_1;
+				break;
+		}
 	}
 	if (content_count > 0) {
 		content_info_t content_info[content_count];
