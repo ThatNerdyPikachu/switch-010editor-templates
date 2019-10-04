@@ -137,8 +137,10 @@ typedef enum <ubyte> {
 typedef enum <ubyte> {
 	SPACE_NAND_SYSTEM,
 	SPACE_NAND_USER,
-	SPACE_SD_CARD,
-	SPACE_TEMPORARY_STORAGE
+	SPACE_SD_CARD_SYSTEM,
+	SPACE_TEMPORARY_STORAGE,
+	SPACE_SD_CARD_USER,
+	SPACE_PROPER_SYSTEM = 100
 } save_data_space_id_t;
 
 typedef struct {
