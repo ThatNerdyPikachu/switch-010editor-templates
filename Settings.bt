@@ -12,7 +12,7 @@ typedef enum <ubyte> {
 do {
 	struct {
 		uint32 name_size;
-		ubyte name[name_size];
+		char name[name_size];
 		value_type_t value_type;
 		uint32 value_size;
 		if (value_type == VALUE_STRING) {
