@@ -9,6 +9,11 @@ typedef enum <ubyte> {
 	VALUE_DATA
 } value_type_t;
 
+typedef enum <ubyte> {
+	FLAG_FALSE,
+	FLAG_TRUE
+} flag_t;
+
 do {
 	struct {
 		uint32 name_size;
@@ -17,8 +22,10 @@ do {
 		uint32 value_size;
 		if (value_type == VALUE_STRING) {
 			char value[value_size];
-		} else {
-			ubyte value[value_size];
+		} else if (value_type == VALUE_FLAG) {
+			flag_t value;
+		} else if (value_type == VALUE_DATA) {
+			uint32 value;
 		}
 	} setting_entry;
 } while (FTell() < file_size);
