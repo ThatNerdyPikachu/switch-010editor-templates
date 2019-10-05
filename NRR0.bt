@@ -1,28 +1,29 @@
 LittleEndian();
 DisplayFormatHex();
 
-typedef enum <uint32> {
+typedef enum <ubyte> {
 	KIND_USER,
 	KIND_JIT_PLUGIN
 } nrr_kind_t;
 
 struct {
-    char magic[0x4];
-    ubyte padding_1[0xC];
+	char magic[0x4];
+	ubyte padding_1[0xC];
 	struct {
 		uint64 title_id_mask;
 		uint64 title_id_pattern;
-		ubyte padding_2[0x10];
+		ubyte padding_1[0x10];
 		ubyte modulus[0x100];
 		ubyte fixed_key_signature[0x100];
 	} certification;
-    ubyte nrr_signature[0x100];
-    uint64 title_id;
-    uint32 nrr_size;
-    nrr_kind_t nrr_kind;
-    uint32 hash_offset;
-    uint32 hash_count;
-    uint64 padding_3;
+	ubyte nrr_signature[0x100];
+	uint64 title_id;
+	uint32 nrr_size;
+	nrr_kind_t nrr_kind;
+	ubyte padding_2[0x3];
+	uint32 hash_offset;
+	uint32 hash_count;
+	uint64 padding_3;
 } nrr0_header;
 
 FSeek(nrr0_header.hash_offset);
