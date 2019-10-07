@@ -275,6 +275,9 @@ for (i = 0; i < 4; i++) {
 		pfs0_header_t pfs0_header;
 	} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].hash_type == HASH_HIERARCHICAL_INTEGRITY && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
 		FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].indirect_header.indirect_offset);
+		if (ReadUInt() != 0) { // Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong
+			break;
+		}
 		indirect_storage_block_t indirect_storage_block;
 		aes_ctr_ex_storage_block_t aes_ctr_ex_storage_block;
 	}
