@@ -19,7 +19,7 @@ struct {
 	uint32 padding_3;
 	uint32 system_resource_size;
 	uint32 version;
-	uint32 main_thead_stack_size;
+	uint32 main_thread_stack_size;
 	char name[0x10];
 	char product_code[0x10];
 	ubyte padding_4[0x30];
