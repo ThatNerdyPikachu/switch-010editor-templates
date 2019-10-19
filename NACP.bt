@@ -85,6 +85,12 @@ typedef enum <ubyte> {
 } runtime_add_on_content_install_t;
 
 typedef enum <ubyte> {
+	DELIVERY_ALWAYS,
+	DELIVERY_ALWAYS_IF_USER_STATE_MATCHED,
+	DELIVERY_ON_RESTART
+} runtime_parameter_delivery_t;
+
+typedef enum <ubyte> {
 	REPORT_DENY,
 	REPORT_ALLOW
 } crash_report_t;
@@ -142,15 +148,16 @@ struct {
 		ubyte gracgcrb;
 		ubyte gsrmr;
 		ubyte esrb;
-		ubyte classind;
+		ubyte class_ind;
 		ubyte usk;
 		ubyte pegi;
-		ubyte pegiportugal;
+		ubyte pegi_portugal;
 		ubyte pegibbfc;
 		ubyte russian;
 		ubyte acb;
 		ubyte oflc;
-		ubyte padding_1[0x14];
+		ubyte iarc_generic;
+		ubyte padding_1[0x13];
 	} rating_age;
 	char display_version[0x10];
 	uint64 add_on_content_base_id;
@@ -165,7 +172,8 @@ struct {
 	logo_type_t logo_type;
 	logo_handling_t logo_handling;
 	runtime_add_on_content_install_t runtime_add_on_content_install;
-	ubyte padding_1[0x3];
+	runtime_parameter_delivery_t runtime_parameter_delivery;
+	ubyte padding_1[0x2];
 	crash_report_t crash_report;
 	hdcp_t hdcp;
 	uint64 seed_for_pseudo_device_id;
