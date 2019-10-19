@@ -72,6 +72,7 @@ typedef struct {
 	ubyte PRESET_ACCESS_FAILURE_RESOLUTION : 1;
 	ubyte PRESET_SAVE_DATA_TRANSFER_VERSION_2 : 1;
 	ubyte PRESET_REGISTER_PROGRAM_INDEX_MAP_INFO : 1;
+	ubyte PRESET_CREATE_OWN_SAVE_DATA : 1;
 	ubyte padding_1[0x2];
 	ubyte : 6;
 	ubyte PRESET_DEBUG : 1;
