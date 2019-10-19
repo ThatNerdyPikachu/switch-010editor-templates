@@ -88,7 +88,7 @@ typedef struct {
 			case META_APPLICATION:
 				uint64 patch_id;
 				uint32 required_system_version;
-				uint32 padding_1;
+				uint32 required_application_version;
 				break;
 			case META_PATCH:
 				uint64 application_id;
