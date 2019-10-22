@@ -30,7 +30,7 @@ struct {
 	ubyte main_signature[0x100];
 	ubyte npdm_signature[0x100];
 	char magic[0x4];
-	if (magic != "NCA3") {
+	if (magic != "NCA0" && magic != "NCA2" && magic != "NCA3") {
 		Warning("File is not decrypted.");
 		Exit(-1);
 	}
@@ -42,7 +42,7 @@ struct {
 	uint64 program_id;
 	uint32 content_index;
 	uint32 sdk_addon_version;
-	ubyte new_key_generation; // 3=3.0.1-3.0.2, 4=4.0.0-4.1.0, 5=5.0.0-5.1.0, 6=6.0.0-6.1.0, 7=6.2.0, 8=7.0.0-7.0.1, 9=8.1.0, A=9.0.0+
+	ubyte new_key_generation; // 3=3.0.1-3.0.2, 4=4.0.0-4.1.0, 5=5.0.0-5.1.0, 6=6.0.0-6.1.0, 7=6.2.0, 8=7.0.0-7.0.1, 9=8.1.0, A=9.0.0-9.0.1
 	ubyte padding_1[0xF];
 	ubyte rights_id[0x10];
 	struct {
@@ -87,7 +87,7 @@ typedef struct {
 	uint64 hash_data_size;
 	uint64 hash_target_offset;
 	uint64 hash_target_size;
-} hierarchical_sha256_t;
+} hierarchical_sha256_t; // Used for PFS0 and NCA0 RomFS
 
 typedef struct {
 	char magic[0x4];
@@ -99,8 +99,8 @@ typedef struct {
 		uint64 hash_data_size;
 		uint32 block_size; // 1 << block_size, log2(size)
 		uint32 padding_1;
-	} levels[level_count];
-	uint64 padding_1;
+	} levels[level_count - 1];
+	ubyte salt_source[0x20];
 	ubyte master_hash[0x20];
 } hierarchical_integrity_t;
 
@@ -159,9 +159,22 @@ typedef struct {
 		uint64 file_size;
 		uint32 name_table_offset;
 		uint32 padding_1;
-	} pfs0_file_entry[file_count];
+	} file_entry[file_count];
 	char name_table[name_table_size];
 } pfs0_header_t;
+
+typedef struct {
+	uint32 header_size;
+	uint32 directory_hash_table_offset;
+	uint32 directory_hash_table_size;
+	uint32 directory_meta_table_offset;
+	uint32 directory_meta_table_size;
+	uint32 file_hash_table_offset;
+	uint32 file_hash_table_size;
+	uint32 file_meta_table_offset;
+	uint32 file_meta_table_size;
+	uint32 data_offset;
+} nca0_romfs_header_t;
 
 typedef struct {
 	uint64 header_size;
@@ -246,34 +259,39 @@ typedef struct {
 	aes_ctr_ex_storage_bucket_t aes_ctr_ex_storage_bucket[bucket_count];
 } aes_ctr_ex_storage_block_t;
 
-local uint64 romfs_header_offset, pfs0_header_offset = 0;
+local uint64 header_offset;
 local uint32 i;
 for (i = 0; i < 4; i++) {
-	if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].hash_type == HASH_HIERARCHICAL_INTEGRITY && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
-		romfs_header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_integrity.levels[5].hash_data_offset;
-		FSeek(romfs_header_offset);
-		romfs_header_t romfs_header;
-		FSeek(romfs_header_offset + romfs_header.directory_hash_table_offset);
-		uint32 romfs_directory_hash[romfs_header.directory_hash_table_size / 4];
-		FSeek(romfs_header_offset + romfs_header.directory_meta_table_offset);
+	if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
+		if (nca3_header.magic == "NCA0") {
+			header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
+			FSeek(header_offset);
+			nca0_romfs_header_t romfs_header;
+		} else {
+			header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_integrity.level[5].hash_data_offset;
+			FSeek(header_offset);
+			romfs_header_t romfs_header;
+		}
+		FSeek(header_offset + romfs_header.directory_hash_table_offset);
+		uint32 romfs_directory_hashes[romfs_header.directory_hash_table_size / 4];
+		FSeek(header_offset + romfs_header.directory_meta_table_offset);
 		struct {
-			while (FTell() < romfs_header_offset + romfs_header.directory_meta_table_offset + romfs_header.directory_meta_table_size) {
+			while (FTell() < header_offset + romfs_header.directory_meta_table_offset + romfs_header.directory_meta_table_size) {
 				romfs_directory_meta_t romfs_directory_meta;
 			}
-		} romfs_directory_meta_table;
-		FSeek(romfs_header_offset + romfs_header.file_hash_table_offset);
-		uint32 romfs_file_hash[romfs_header.file_hash_table_size / 4];
-		FSeek(romfs_header_offset + romfs_header.file_meta_table_offset);
+		} romfs_directory_meta_entries;
+		FSeek(header_offset + romfs_header.file_hash_table_offset);
+		uint32 romfs_file_hashes[romfs_header.file_hash_table_size / 4];
+		FSeek(header_offset + romfs_header.file_meta_table_offset);
 		struct {
-			while (FTell() < romfs_header_offset + romfs_header.file_meta_table_offset + romfs_header.file_meta_table_size) {
+			while (FTell() < header_offset + romfs_header.file_meta_table_offset + romfs_header.file_meta_table_size) {
 				romfs_file_meta_t romfs_file_meta;
 			}
-		} romfs_file_meta_table;
-	} else if (nca_fs_header[i].format_type == FORMAT_PFS0 && nca_fs_header[i].hash_type == HASH_HIERARCHICAL_SHA256 && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
-		pfs0_header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
-		FSeek(pfs0_header_offset);
+		} romfs_file_meta_entries;
+	} else if (nca_fs_header[i].format_type == FORMAT_PFS0 && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
+		FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset);
 		pfs0_header_t pfs0_header;
-	} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].hash_type == HASH_HIERARCHICAL_INTEGRITY && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
+	} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
 		FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].indirect_header.indirect_offset);
 		if (ReadUInt() != 0) { // Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong
 			break;
