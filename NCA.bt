@@ -145,7 +145,7 @@ struct {
 		ubyte padding_2[0x138];
 	}
 	uint32 generation;
-	uint32 secure_value; // Program = 1 (nca_fs_header[0]), 2 (nca_fs_header[1]) - Manual = 4 (For HtmlDocument CNMT Content Type), 5 (For LegalInformation CNMT Content Type)
+	uint32 secure_value; // Program = 1 (nca_fs_header[0]), 2 (nca_fs_header[1]) - Manual = 4 (HtmlDocument), 5 (LegalInformation)
 	ubyte padding_3[0xB8];
 } nca_fs_header[4] <optimize=false>;
 
@@ -193,7 +193,7 @@ typedef struct {
 	uint32 parent_offset;
 	uint32 sibling_offset;
 	uint32 child_offset;
-	uint32 file_offset;
+	uint32 child_file_offset;
 	uint32 hash_offset;
 	uint32 name_length; // 0x300 limit
 	char name[name_length];
@@ -262,41 +262,39 @@ typedef struct {
 local uint64 header_offset;
 local uint32 i;
 for (i = 0; i < 4; i++) {
-	if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
-		if (nca3_header.magic == "NCA0") {
-			header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
-			FSeek(header_offset);
-			nca0_romfs_header_t romfs_header;
-		} else {
-			header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_integrity.level[5].hash_data_offset;
-			FSeek(header_offset);
-			romfs_header_t romfs_header;
-		}
-		FSeek(header_offset + romfs_header.directory_hash_table_offset);
-		uint32 romfs_directory_hashes[romfs_header.directory_hash_table_size / 4];
-		FSeek(header_offset + romfs_header.directory_meta_table_offset);
-		struct {
-			while (FTell() < header_offset + romfs_header.directory_meta_table_offset + romfs_header.directory_meta_table_size) {
-				romfs_directory_meta_t romfs_directory_meta;
+	if (nca3_header.fs_entries[i].entry_flag) {
+		if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
+			if (nca3_header.magic == "NCA0") {
+				header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
+				FSeek(header_offset);
+				nca0_romfs_header_t romfs_header;
+			} else {
+				header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_integrity.levels[5].hash_data_offset;
+				FSeek(header_offset);
+				romfs_header_t romfs_header;
 			}
-		} romfs_directory_meta_entries;
-		FSeek(header_offset + romfs_header.file_hash_table_offset);
-		uint32 romfs_file_hashes[romfs_header.file_hash_table_size / 4];
-		FSeek(header_offset + romfs_header.file_meta_table_offset);
-		struct {
-			while (FTell() < header_offset + romfs_header.file_meta_table_offset + romfs_header.file_meta_table_size) {
-				romfs_file_meta_t romfs_file_meta;
-			}
-		} romfs_file_meta_entries;
-	} else if (nca_fs_header[i].format_type == FORMAT_PFS0 && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
-		FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset);
-		pfs0_header_t pfs0_header;
-	} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
-		FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].indirect_header.indirect_offset);
-		if (ReadUInt() != 0) { // Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong
-			break;
+			FSeek(header_offset + romfs_header.directory_hash_table_offset);
+			uint32 romfs_directory_hashes[romfs_header.directory_hash_table_size / 4];
+			struct {
+				while (FTell() < header_offset + romfs_header.directory_meta_table_offset + romfs_header.directory_meta_table_size) {
+					romfs_directory_meta_t romfs_directory_meta;
+				}
+			} romfs_directory_meta_entries;
+			FSeek(header_offset + romfs_header.file_hash_table_offset);
+			uint32 romfs_file_hashes[romfs_header.file_hash_table_size / 4];
+			struct {
+				while (FTell() < header_offset + romfs_header.file_meta_table_offset + romfs_header.file_meta_table_size) {
+					romfs_file_meta_t romfs_file_meta;
+				}
+			} romfs_file_meta_entries;
+		} else if (nca_fs_header[i].format_type == FORMAT_PFS0 && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
+			FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset);
+			pfs0_header_t pfs0_header;
+		} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
+			FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].indirect_header.indirect_offset);
+			if (ReadUInt() != 0) break; // Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong
+			indirect_storage_block_t indirect_storage_block;
+			aes_ctr_ex_storage_block_t aes_ctr_ex_storage_block;
 		}
-		indirect_storage_block_t indirect_storage_block;
-		aes_ctr_ex_storage_block_t aes_ctr_ex_storage_block;
 	}
 }
