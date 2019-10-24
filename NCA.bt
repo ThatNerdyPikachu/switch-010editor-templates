@@ -109,18 +109,18 @@ typedef struct {
 	uint32 bucket_count;
 	uint32 entry_count;
 	uint32 padding_1;
-} bucket_tree_header_t;
+} bktr_header_t;
 
 typedef struct {
 	uint64 indirect_offset;
 	uint64 indirect_size;
-	bucket_tree_header_t bucket_tree_header;
+	bktr_header_t bktr_header;
 } indirect_header_t;
 
 typedef struct {
 	uint64 aes_ctr_ex_offset;
 	uint64 aes_ctr_ex_size;
-	bucket_tree_header_t bucket_tree_header;
+	bktr_header_t bktr_header;
 } aes_ctr_ex_header_t;
 
 struct {
@@ -190,9 +190,9 @@ typedef struct {
 } romfs_header_t;
 
 typedef struct {
-	uint32 parent_offset;
-	uint32 sibling_offset;
-	uint32 child_offset;
+	uint32 parent_directory_offset;
+	uint32 sibling_directory_offset;
+	uint32 child_directory_offset;
 	uint32 child_file_offset;
 	uint32 hash_offset;
 	uint32 name_length; // 0x300 limit
@@ -201,8 +201,8 @@ typedef struct {
 } romfs_directory_meta_t;
 
 typedef struct {
-	uint32 parent_offset;
-	uint32 sibling_offset;
+	uint32 parent_directory_offset;
+	uint32 sibling_file_offset;
 	uint64 file_offset;
 	uint64 file_size;
 	uint32 hash_offset;
