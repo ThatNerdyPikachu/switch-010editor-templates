@@ -57,7 +57,7 @@ struct {
 	struct {
 		ubyte encrypted_key[0x10];
 	} encrypted_keys[16];
-} nca3_header;
+} nca_header;
 
 typedef enum <ubyte> {
 	FORMAT_ROMFS,
@@ -262,14 +262,14 @@ typedef struct {
 local uint64 header_offset;
 local uint32 i;
 for (i = 0; i < 4; i++) {
-	if (nca3_header.fs_entries[i].entry_flag) {
+	if (nca_header.fs_entries[i].entry_flag) {
 		if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
-			if (nca3_header.magic == "NCA0") {
-				header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
+			if (nca_header.magic == "NCA0") {
+				header_offset = (nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
 				FSeek(header_offset);
 				nca0_romfs_header_t romfs_header;
 			} else {
-				header_offset = (nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_integrity.levels[5].hash_data_offset;
+				header_offset = (nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_integrity.levels[5].hash_data_offset;
 				FSeek(header_offset);
 				romfs_header_t romfs_header;
 			}
@@ -288,10 +288,10 @@ for (i = 0; i < 4; i++) {
 				}
 			} romfs_file_meta_entries;
 		} else if (nca_fs_header[i].format_type == FORMAT_PFS0 && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
-			FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset);
+			FSeek((nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset);
 			pfs0_header_t pfs0_header;
 		} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
-			FSeek((nca3_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].indirect_header.indirect_offset);
+			FSeek((nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].indirect_header.indirect_offset);
 			if (ReadUInt() != 0) break; // Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong
 			indirect_storage_block_t indirect_storage_block;
 			aes_ctr_ex_storage_block_t aes_ctr_ex_storage_block;
