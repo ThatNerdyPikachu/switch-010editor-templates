@@ -20,12 +20,12 @@ typedef enum <ubyte> {
 } content_type_t;
 
 typedef enum <ubyte> {
-	META_SYSTEM_PROGRAM = 0x1,
+	META_SYSTEM_PROGRAM = 1,
 	META_SYSTEM_DATA,
 	META_SYSTEM_UPDATE,
 	META_BOOT_IMAGE_PACKAGE,
 	META_BOOT_IMAGE_PACKAGE_SAFE,
-	META_APPLICATION = 0x80,
+	META_APPLICATION = 128,
 	META_PATCH,
 	META_ADD_ON_CONTENT,
 	META_DELTA
@@ -59,7 +59,7 @@ typedef struct {
 } content_info_t;
 
 typedef struct {
-	uint64 title_id;
+	uint64 id;
 	uint32 version;
 	content_meta_type_t content_meta_type;
 	content_meta_attribute_t content_meta_attribute;
@@ -67,7 +67,7 @@ typedef struct {
 } content_meta_info_t;
 
 typedef struct {
-	uint64 title_id;
+	uint64 id;
 	uint32 version;
 	content_meta_type_t content_meta_type;
 	content_install_type_t content_install_type;
@@ -81,7 +81,7 @@ typedef struct {
 	content_meta_attribute_t content_meta_attribute;
 	storage_id_t storage_id;
 	if (extended_header_size > 0) {
-		switch (key.content_meta_type) {
+		switch (content_meta_key.content_meta_type) {
 			case META_SYSTEM_UPDATE:
 				uint32 extended_data_size;
 				break;
@@ -134,17 +134,8 @@ typedef enum <ubyte> {
 	RANK_SECONDARY
 } save_data_rank_t;
 
-typedef enum <ubyte> {
-	SPACE_NAND_SYSTEM,
-	SPACE_NAND_USER,
-	SPACE_SD_CARD_SYSTEM,
-	SPACE_TEMPORARY_STORAGE,
-	SPACE_SD_CARD_USER,
-	SPACE_PROPER_SYSTEM = 100
-} save_data_space_id_t;
-
 typedef struct {
-	uint64 title_id;
+	uint64 program_id;
 	ubyte user_id[0x10];
 	uint64 save_id;
 	save_data_type_t save_data_type;
@@ -153,12 +144,32 @@ typedef struct {
 	ubyte padding_1[0x1C];
 } save_data_key_t;
 
+typedef enum <ubyte> {
+	SPACE_NAND_SYSTEM,
+	SPACE_NAND_USER,
+	SPACE_SD_CARD_SYSTEM,
+	SPACE_TEMPORARY_STORAGE,
+	SPACE_SD_CARD_CACHE,
+	SPACE_PROPER_SYSTEM = 100,
+	SPACE_SAFE,
+	SPACE_BIS_AUTO = 127 
+} save_data_space_id_t;
+
+typedef enum <ubyte> {
+	STATE_NORMAL,
+	STATE_CREATE,
+	STATE_UNKNOWN,
+	STATE_DELETE,
+	STATE_EXTEND
+} save_data_state_t;
+
 typedef struct {
 	uint64 save_id;
 	uint64 size;
 	uint64 padding_1;
 	save_data_space_id_t save_data_space_id;
-	ubyte padding_2[0x27];
+	save_data_state_t save_data_state;
+	ubyte padding_2[0x26];
 } save_data_value_t;
 
 struct {
@@ -166,10 +177,10 @@ struct {
 	uint32 key_size;
 	uint32 value_size;
 	if (key_size == 0x10) {
-		content_meta_key_t key;
-		content_meta_value_t value;
+		content_meta_key_t content_meta_key;
+		content_meta_value_t content_meta_value;
 	} else if (key_size == 0x40) {
-		save_data_key_t key;
-		save_data_value_t value;
+		save_data_key_t save_data_key;
+		save_data_value_t save_data_value;
 	}
 } kvdb_entry[kvdb_header.entry_count] <optimize=false>;
