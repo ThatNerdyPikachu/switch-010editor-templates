@@ -61,7 +61,7 @@ struct {
 
 typedef enum <ubyte> {
 	FORMAT_ROMFS,
-	FORMAT_PFS0
+	FORMAT_PARTITIONFS
 } format_type_t;
 
 typedef enum <ubyte> {
@@ -227,7 +227,7 @@ typedef struct {
 	uint32 entry_count;
 	uint64 virtual_offset_end;
 	indirect_storage_entry_t indirect_storage_entry[0x3FF0 / 0x14];
-	ubyte padding_2[0x3FF0 % 0x14];
+	ubyte padding_1[0x3FF0 % 0x14];
 } indirect_storage_bucket_t;
 
 typedef struct {
@@ -287,7 +287,7 @@ for (i = 0; i < 4; i++) {
 					romfs_file_meta_t romfs_file_meta;
 				}
 			} romfs_file_meta_entries;
-		} else if (nca_fs_header[i].format_type == FORMAT_PFS0 && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
+		} else if (nca_fs_header[i].format_type == FORMAT_PARTITIONFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
 			FSeek((nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset);
 			pfs0_header_t pfs0_header;
 		} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
