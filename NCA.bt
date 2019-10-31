@@ -155,8 +155,8 @@ typedef struct {
 	uint32 name_table_size;
 	uint32 padding_1;
 	struct {
-		uint64 file_offset;
-		uint64 file_size;
+		uint64 data_offset;
+		uint64 data_size;
 		uint32 name_table_offset;
 		uint32 padding_1;
 	} file_entry[file_count];
@@ -167,12 +167,12 @@ typedef struct {
 	uint32 header_size;
 	uint32 directory_hash_table_offset;
 	uint32 directory_hash_table_size;
-	uint32 directory_meta_table_offset;
-	uint32 directory_meta_table_size;
+	uint32 directory_info_table_offset;
+	uint32 directory_info_table_size;
 	uint32 file_hash_table_offset;
 	uint32 file_hash_table_size;
-	uint32 file_meta_table_offset;
-	uint32 file_meta_table_size;
+	uint32 file_info_table_offset;
+	uint32 file_info_table_size;
 	uint32 data_offset;
 } nca0_romfs_header_t;
 
@@ -180,12 +180,12 @@ typedef struct {
 	uint64 header_size;
 	uint64 directory_hash_table_offset;
 	uint64 directory_hash_table_size;
-	uint64 directory_meta_table_offset;
-	uint64 directory_meta_table_size;
+	uint64 directory_info_table_offset;
+	uint64 directory_info_table_size;
 	uint64 file_hash_table_offset;
 	uint64 file_hash_table_size;
-	uint64 file_meta_table_offset;
-	uint64 file_meta_table_size;
+	uint64 file_info_table_offset;
+	uint64 file_info_table_size;
 	uint64 data_offset;
 } romfs_header_t;
 
@@ -198,18 +198,18 @@ typedef struct {
 	uint32 name_length; // 0x300 limit
 	char name[name_length];
 	ubyte padding_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
-} romfs_directory_meta_t;
+} romfs_directory_info_t;
 
 typedef struct {
 	uint32 parent_directory_offset;
 	uint32 sibling_file_offset;
-	uint64 file_offset;
-	uint64 file_size;
+	uint64 data_offset;
+	uint64 data_size;
 	uint32 hash_offset;
 	uint32 name_length; // 0x300 limit
 	char name[name_length];
 	ubyte padding_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
-} romfs_file_meta_t;
+} romfs_file_info_t;
 
 typedef enum <uint32> {
 	INDEX_ORIGINAL,
@@ -225,7 +225,7 @@ typedef struct {
 typedef struct { 
 	uint32 index;
 	uint32 entry_count;
-	uint64 virtual_offset_end;
+	uint64 end_offset;
 	indirect_storage_entry_t indirect_storage_entry[0x3FF0 / 0x14];
 	ubyte padding_1[0x3FF0 % 0x14];
 } indirect_storage_bucket_t;
@@ -233,7 +233,7 @@ typedef struct {
 typedef struct {
 	uint32 index;
 	uint32 bucket_count;
-	uint64 virtual_size;
+	uint64 total_size;
 	uint64 virtual_offsets[0x3FF0 / 0x8];
 	indirect_storage_bucket_t indirect_storage_bucket[bucket_count];
 } indirect_storage_block_t;
@@ -247,14 +247,14 @@ typedef struct {
 typedef struct {
 	uint32 index;
 	uint32 entry_count;
-	uint64 physical_offset_end;
+	uint64 end_offset;
 	aes_ctr_ex_storage_entry_t aes_ctr_ex_storage_entry[0x3FF];
 } aes_ctr_ex_storage_bucket_t;
 
 typedef struct {
 	uint32 index;
 	uint32 bucket_count;
-	uint64 physical_size;
+	uint64 total_size;
 	uint64 physical_offsets[0x3FF0 / 0x8];
 	aes_ctr_ex_storage_bucket_t aes_ctr_ex_storage_bucket[bucket_count];
 } aes_ctr_ex_storage_block_t;
@@ -274,19 +274,19 @@ for (i = 0; i < 4; i++) {
 				romfs_header_t romfs_header;
 			}
 			FSeek(header_offset + romfs_header.directory_hash_table_offset);
-			uint32 romfs_directory_hashes[romfs_header.directory_hash_table_size / 4];
+			uint32 romfs_directory_hash_entries[romfs_header.directory_hash_table_size / 4];
 			struct {
-				while (FTell() < header_offset + romfs_header.directory_meta_table_offset + romfs_header.directory_meta_table_size) {
-					romfs_directory_meta_t romfs_directory_meta;
+				while (FTell() < header_offset + romfs_header.directory_info_table_offset + romfs_header.directory_info_table_size) {
+					romfs_directory_info_t romfs_directory_info;
 				}
-			} romfs_directory_meta_entries;
+			} romfs_directory_info_entries;
 			FSeek(header_offset + romfs_header.file_hash_table_offset);
-			uint32 romfs_file_hashes[romfs_header.file_hash_table_size / 4];
+			uint32 romfs_file_hash_entries[romfs_header.file_hash_table_size / 4];
 			struct {
-				while (FTell() < header_offset + romfs_header.file_meta_table_offset + romfs_header.file_meta_table_size) {
-					romfs_file_meta_t romfs_file_meta;
+				while (FTell() < header_offset + romfs_header.file_info_table_offset + romfs_header.file_info_table_size) {
+					romfs_file_info_t romfs_file_info;
 				}
-			} romfs_file_meta_entries;
+			} romfs_file_info_entries;
 		} else if (nca_fs_header[i].format_type == FORMAT_PARTITIONFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
 			FSeek((nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset);
 			pfs0_header_t pfs0_header;
