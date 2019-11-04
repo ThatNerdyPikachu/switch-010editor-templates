@@ -222,7 +222,7 @@ typedef struct {
 	indirect_storage_index_t indirect_storage_index;
 } indirect_storage_entry_t;
 
-typedef struct { 
+typedef struct {
 	uint32 index;
 	uint32 entry_count;
 	uint64 end_offset;
@@ -260,7 +260,7 @@ typedef struct {
 } aes_ctr_ex_storage_block_t;
 
 local uint64 header_offset;
-local uint32 i;
+local uint32 i, j, romfs_file_count;
 for (i = 0; i < 4; i++) {
 	if (nca_header.fs_entries[i].entry_flag) {
 		if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
@@ -285,11 +285,29 @@ for (i = 0; i < 4; i++) {
 			struct {
 				while (FTell() < header_offset + romfs_header.file_info_table_offset + romfs_header.file_info_table_size) {
 					romfs_file_info_t romfs_file_info;
+					romfs_file_count++;
 				}
 			} romfs_file_info_entries;
+			FSeek(header_offset + romfs_header.data_offset);
+			struct {
+				for (j = 0; j < romfs_file_count; j++) {
+					struct {
+						ubyte file[romfs_file_info_entries.romfs_file_info[j].data_size];
+					} romfs_file_entry;
+				}
+			} romfs_file_entries;
 		} else if (nca_fs_header[i].format_type == FORMAT_PARTITIONFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
-			FSeek((nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset);
+			header_offset = (nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
+			FSeek(header_offset);
 			pfs0_header_t pfs0_header;
+			FSeek(header_offset + sizeof(pfs0_header));
+			struct {
+				for (j = 0; j < pfs0_header.file_count; j++) {
+					struct {
+						ubyte file[pfs0_header.file_entry[j].data_size];
+					} pfs0_file_entry;
+				}
+			} pfs0_file_entries;
 		} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
 			FSeek((nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].indirect_header.indirect_offset);
 			if (ReadUInt() != 0) break; // Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong
