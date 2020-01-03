@@ -3,6 +3,7 @@ DisplayFormatHex();
 
 typedef struct {
 	ubyte FLAG_IS_64_BIT_INSTRUCTION : 1;
+	// FLAG_ADDRESS_SPACE_32_BIT
 	ubyte FLAG_ADDRESS_SPACE_64_BIT_OLD : 1;
 	ubyte FLAG_ADDRESS_SPACE_32_BIT_NO_RESERVED : 1;
 	ubyte FLAG_ADDRESS_SPACE_64_BIT : 1;
@@ -18,7 +19,7 @@ struct {
 	ubyte main_thread_core_number;
 	uint32 padding_3;
 	uint32 system_resource_size;
-	uint32 version;
+	uint32 version; // 0=1.0.0-8.0.1, 1=8.1.0-9.0.1, Other=CNMT Version+X
 	uint32 main_thread_stack_size;
 	char name[0x10];
 	char product_code[0x10];
@@ -32,9 +33,9 @@ struct {
 typedef struct {
 	ubyte FLAG_PRODUCTION : 1;
 	ubyte FLAG_UNQUALIFIED_APPROVAL : 1;
-	ubyte FLAG_POOL_PARTITION : 2;
-	ubyte padding_1[0x3];
-} acid_flags_t;
+	ubyte FLAG_USE_SECURE_MEMORY : 1; // Deprecated
+	ubyte FLAG_POOL_PARTITION : 2; // Application, Applet, System, SystemNonSecure
+} acid_flags_t <size=0x4>;
 
 typedef struct {
 	ubyte PRESET_APPLICATION_INFO : 1;
@@ -73,8 +74,9 @@ typedef struct {
 	ubyte PRESET_SAVE_DATA_TRANSFER_VERSION_2 : 1;
 	ubyte PRESET_REGISTER_PROGRAM_INDEX_MAP_INFO : 1;
 	ubyte PRESET_CREATE_OWN_SAVE_DATA : 1;
-	ubyte padding_1[0x2];
-	ubyte : 6;
+	ubyte PRESET_RESERVED1 : 8;
+	ubyte PRESET_RESERVED2 : 8;
+	ubyte PRESET_RESERVED3 : 6;
 	ubyte PRESET_DEBUG : 1;
 	ubyte PRESET_FULL_PERMISSION : 1;
 } flag_presets_bit_t;
@@ -99,7 +101,7 @@ typedef struct {
 
 typedef struct {
 	ubyte DESCRIPTOR_NAME_LENGTH : 3;
-	ubyte : 4;
+	ubyte DESCRIPTOR_RESERVED : 4;
 	ubyte DESCRIPTOR_IS_SERVER : 1;
 } descriptor_t;
 
@@ -108,12 +110,13 @@ typedef struct {
 	char name[descriptor.DESCRIPTOR_NAME_LENGTH + 1];
 } sac_entry_t;
 
+FSeek(meta_header.acid_offset);
 struct {
 	ubyte signature[0x100];
 	ubyte modulus[0x100];
 	char magic[0x4];
 	uint32 sign_size;
-	uint32 padding_1;
+	uint32 version;
 	acid_flags_t flags;
 	uint64 program_id_min;
 	uint64 program_id_max;
@@ -126,12 +129,8 @@ struct {
 	uint64 padding_2;
 	fac_descriptor_t fac_descriptor;
 	FSeek(meta_header.acid_offset + sac_offset);
-	struct {
-		do {
-			sac_entry_t sac_entry;
-		} while (FTell() < meta_header.acid_offset + sac_offset + sac_size);
-	} sac_data;
-	// kc_data
+	do { sac_entry_t sac_entry; } while (FTell() < meta_header.acid_offset + sac_offset + sac_size);
+	// TODO: kc_data
 } acid_header;
 
 typedef enum {
@@ -174,10 +173,6 @@ struct {
 	uint64 padding_3;
 	fac_data_t fac_data;
 	FSeek(meta_header.aci0_offset + sac_offset);
-	struct {
-		do {
-			sac_entry_t sac_entry;
-		} while (FTell() < meta_header.aci0_offset + sac_offset + sac_size);
-	} sac_data;
-	// kc_data
+	do { sac_entry_t sac_entry; } while (FTell() < meta_header.aci0_offset + sac_offset + sac_size);
+	// TODO: kc_data
 } aci0_header;
