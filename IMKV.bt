@@ -3,184 +3,219 @@ DisplayFormatHex();
 
 local uint32 extended_data_size = 0;
 
-struct {
-	char magic[0x4];
-	uint32 padding_1;
-	uint32 entry_count;
-} kvdb_header;
+/* ContentMeta */
+typedef enum <ubyte> {
+	ContentType_Meta             = 0,
+	ContentType_Program          = 1,
+	ContentType_Data             = 2,
+	ContentType_Control          = 3,
+	ContentType_HtmlDocument     = 4,
+	ContentType_LegalInformation = 5,
+	ContentType_DeltaFragment    = 6 /* [3.0.0+] */
+} ContentType;
 
 typedef enum <ubyte> {
-	CONTENT_META,
-	CONTENT_PROGRAM,
-	CONTENT_DATA,
-	CONTENT_CONTROL,
-	CONTENT_HTML_DOCUMENT,
-	CONTENT_LEGAL_INFORMATION,
-	CONTENT_DELTA_FRAGMENT
-} content_type_t;
+	ContentMetaType_Unknown              = 0,
+	ContentMetaType_SystemProgram        = 1,
+	ContentMetaType_SystemData           = 2,
+	ContentMetaType_SystemUpdate         = 3,
+	ContentMetaType_BootImagePackage     = 4,
+	ContentMetaType_BootImagePackageSafe = 5,
+	ContentMetaType_Application          = 128,
+	ContentMetaType_Patch                = 129,
+	ContentMetaType_AddOnContent         = 130,
+	ContentMetaType_Delta                = 131 /* [3.0.0+] */
+} ContentMetaType;
 
 typedef enum <ubyte> {
-	META_SYSTEM_PROGRAM = 1,
-	META_SYSTEM_DATA,
-	META_SYSTEM_UPDATE,
-	META_BOOT_IMAGE_PACKAGE,
-	META_BOOT_IMAGE_PACKAGE_SAFE,
-	META_APPLICATION = 128,
-	META_PATCH,
-	META_ADD_ON_CONTENT,
-	META_DELTA
-} content_meta_type_t;
-
-typedef struct {
-	ubyte ATTRIBUTE_INCLUDEX_EX_FAT_DRIVER : 1;
-	ubyte ATTRIBUTE_REBOOTLESS : 1;
-} content_meta_attribute_t;
+	ContentMetaAttribute_None                = 0,
+	ContentMetaAttribute_IncludesExFatDriver = 1 << 0,
+	ContentMetaAttribute_Rebootless          = 1 << 1 /* [3.0.0+] */
+} ContentMetaAttribute;
 
 typedef enum <ubyte> {
-	INSTALL_FULL,
-	INSTALL_FRAGMENT_ONLY
-} content_install_type_t;
+	ContentInstallType_Full         = 0,
+	ContentInstallType_FragmentOnly = 1,
+	ContentInstallType_Unknown      = 7
+} ContentInstallType;
 
 typedef enum <ubyte> {
-	STORAGE_NONE,
-	STORAGE_HOST,
-	STORAGE_GAME_CARD,
-	STORAGE_NAND_SYSTEM,
-	STORAGE_NAND_USER,
-	STORAGE_SD_CARD
-} storage_id_t;
-
-typedef struct {
-	ubyte content_id[0x10];
-	uint32 size_low;
-	uint16 size_high;
-	content_type_t content_type;
-	ubyte id_offset;
-} content_info_t;
+	StorageId_None          = 0,
+	StorageId_Host          = 1,
+	StorageId_GameCard      = 2,
+	StorageId_System        = 3,
+	StorageId_User          = 4,
+	StorageId_SdCard        = 5,
+	StorageId_Any           = 6
+} StorageId;
 
 typedef struct {
 	uint64 id;
 	uint32 version;
-	content_meta_type_t content_meta_type;
-	content_meta_attribute_t content_meta_attribute;
-	uint16 padding_1;
-} content_meta_info_t;
-
-typedef struct {
-	uint64 id;
-	uint32 version;
-	content_meta_type_t content_meta_type;
-	content_install_type_t content_install_type;
-	uint16 padding_1;
-} content_meta_key_t;
+	ContentMetaType content_meta_type;
+	ContentInstallType content_install_type;
+	uint16 padding;
+} ContentMetaKey;
 
 typedef struct {
 	uint16 extended_header_size;
 	uint16 content_count;
 	uint16 content_meta_count;
-	content_meta_attribute_t content_meta_attribute;
-	storage_id_t storage_id;
-	if (extended_header_size > 0) {
+	ContentMetaAttribute content_meta_attribute;
+	StorageId storage_id;
+} ContentMetaHeader;
+
+typedef struct {
+	uint32 extended_data_size;
+} SystemUpdateMetaExtendedHeader; /* [8.0.0+] */
+
+typedef struct {
+	uint64 patch_id;
+	uint32 required_system_version;
+	uint32 required_application_version; /* [9.0.0+] */
+} ApplicationMetaExtendedHeader;
+
+typedef struct {
+	uint64 application_id;
+	uint32 required_system_version;
+	uint32 extended_data_size; /* [3.0.0+] */
+	uint64 padding; /* [3.0.0+] */
+} PatchMetaExtendedHeader;
+
+typedef struct {
+	uint64 application_id;
+	uint32 required_application_version;
+	uint32 padding;
+} AddOnContentMetaExtendedHeader;
+
+typedef struct {
+	uint64 application_id;
+	uint32 extended_data_size;
+	uint32 padding;
+} DeltaMetaExtendedHeader; /* [3.0.0+] */
+
+typedef struct {
+	ubyte content_id[0x10];
+	ubyte size[0x6]; /* uint32 size_low, uint16 size_high */
+	ContentType content_type;
+	ubyte id_offset;
+} ContentInfo;
+
+typedef struct {
+	uint64 id;
+	uint32 version;
+	ContentMetaType content_meta_type;
+	ContentMetaAttribute content_meta_attribute;
+	uint16 padding;
+} ContentMetaInfo;
+
+typedef struct {
+	ContentMetaKey content_meta_key;
+	ContentMetaHeader content_meta_header;
+	if (content_meta_header.extended_header_size > 0) {
 		switch (content_meta_key.content_meta_type) {
-			case META_SYSTEM_UPDATE:
-				uint32 extended_data_size;
+			case ContentMetaType_SystemUpdate:
+				SystemUpdateMetaExtendedHeader extended_header;
+				extended_data_size = extended_header.extended_data_size;
 				break;
-			case META_APPLICATION:
-				uint64 patch_id;
-				uint32 required_system_version;
-				uint32 required_application_version;
+			case ContentMetaType_Application:
+				ApplicationMetaExtendedHeader extended_header;
 				break;
-			case META_PATCH:
-				uint64 application_id;
-				uint32 required_system_version;
-				uint32 extended_data_size;
-				uint64 padding_1;
+			case ContentMetaType_Patch:
+				PatchMetaExtendedHeader extended_header;
+				extended_data_size = extended_header.extended_data_size;
 				break;
-			case META_ADD_ON_CONTENT:
-				uint64 application_id;
-				uint32 required_application_version;
-				uint32 padding_1;
+			case ContentMetaType_AddOnContent:
+				AddOnContentMetaExtendedHeader extended_header;
 				break;
-			case META_DELTA:
-				uint64 application_id;
-				uint32 extended_data_size;
-				uint32 padding_1;
+			case ContentMetaType_Delta:
+				DeltaMetaExtendedHeader extended_header;
+				extended_data_size = extended_header.extended_data_size;
 				break;
 		}
 	}
-	if (content_count > 0) {
-		content_info_t content_info[content_count];
-	}
-	if (content_meta_count > 0) {
-		content_meta_info_t content_meta_info[content_meta_count];
-	}
-	if (extended_data_size > 0) {
-		ubyte extended_data[extended_data_size];
-	}
-} content_meta_value_t;
+	ContentInfo content_info[content_meta_header.content_count];
+	ContentMetaInfo content_meta_info[content_meta_header.content_meta_count];
+	ubyte extended_data[extended_data_size];
+	extended_data_size = 0;
+} ContentMeta;
+
+/* SaveData */
+typedef enum <ubyte> {
+	SaveDataType_System     = 0,
+	SaveDataType_Account    = 1,
+	SaveDataType_Bcat       = 2,
+	SaveDataType_Device     = 3,
+	SaveDataType_Temporary  = 4, /* [3.0.0+] */
+	SaveDataType_Cache      = 5, /* [3.0.0+] */
+	SaveDataType_SystemBcat = 6  /* [3.0.0+] */
+} SaveDataType;
 
 typedef enum <ubyte> {
-	TYPE_SYSTEM_SAVE_DATA,
-	TYPE_SAVE_DATA,
-	TYPE_BCAT_DELIVERY_CACHE_STORAGE,
-	TYPE_DEVICE_SAVE_DATA,
-	TYPE_TEMPORARY_STORAGE,
-	TYPE_CACHE_STORAGE,
-	TYPE_BCAT_SYSTEM_STORAGE
-} save_data_type_t;
+	SaveDataRank_Primary   = 0,
+	SaveDataRank_Secondary = 1
+} SaveDataRank;
 
 typedef enum <ubyte> {
-	RANK_PRIMARY,
-	RANK_SECONDARY
-} save_data_rank_t;
+	SaveDataSpaceId_System       = 0,
+	SaveDataSpaceId_User         = 1,
+	SaveDataSpaceId_SdSystem     = 2,
+	SaveDataSpaceId_Temporary    = 3,   /* [3.0.0+] */
+	SaveDataSpaceId_SdCache      = 4,   /* [4.0.0+] */
+	SaveDataSpaceId_ProperSystem = 100, /* [3.0.0+] */
+	SaveDataSpaceId_SafeMode     = 101, /* [3.0.0+] */
+	SaveDataSpaceId_BisAuto      = 127  /* [3.0.0+] */
+} SaveDataSpaceId;
+
+typedef enum <ubyte> {
+	SaveDataState_Normal  = 0,
+	SaveDataState_Create  = 1,
+	SaveDataState_Unknown = 2,
+	SaveDataState_Delete  = 3,
+	SaveDataState_Extend  = 4
+} SaveDataState;
 
 typedef struct {
 	uint64 program_id;
-	ubyte user_id[0x10];
-	uint64 save_id;
-	save_data_type_t save_data_type;
-	save_data_rank_t save_data_rank;
-	uint16 index;
-	ubyte padding_1[0x1C];
-} save_data_key_t;
-
-typedef enum <ubyte> {
-	SPACE_NAND_SYSTEM,
-	SPACE_NAND_USER,
-	SPACE_SD_CARD_SYSTEM,
-	SPACE_TEMPORARY_STORAGE,
-	SPACE_SD_CARD_CACHE,
-	SPACE_PROPER_SYSTEM = 100,
-	SPACE_SAFE,
-	SPACE_BIS_AUTO = 127 
-} save_data_space_id_t;
-
-typedef enum <ubyte> {
-	STATE_NORMAL,
-	STATE_CREATE,
-	STATE_UNKNOWN,
-	STATE_DELETE,
-	STATE_EXTEND
-} save_data_state_t;
+	ubyte  user_id[0x10];
+	uint64 save_data_id;
+	SaveDataType save_data_type;
+	SaveDataRank save_data_rank;
+	uint16 save_data_index;
+	ubyte  padding[0x1C];
+} SaveDataAttribute;
 
 typedef struct {
-	uint64 save_id;
-	uint64 size;
+	uint64 save_data_id;
+	uint64 save_data_size;
 	uint64 padding_1;
-	save_data_space_id_t save_data_space_id;
-	save_data_state_t save_data_state;
-	ubyte padding_2[0x26];
-} save_data_value_t;
+	SaveDataSpaceId save_data_space_id;
+	SaveDataState save_data_state;
+	ubyte  padding_2[0x26];
+} SaveDataIndexer;
 
-struct {
-	char magic[0x4];
+typedef struct {
+	SaveDataAttribute save_data_attribute;
+	SaveDataIndexer save_data_indexer;
+} SaveData;
+
+/* IMKVDB */
+typedef struct {
+	char   magic[0x4];
+	uint32 padding;
+	uint32 entry_count;
+} KvdbHeader;
+
+typedef struct {
+	char   magic[0x4];
 	uint32 key_size;
 	uint32 value_size;
 	if (key_size == 0x10) {
-		content_meta_key_t content_meta_key;
-		content_meta_value_t content_meta_value;
+		ContentMeta content_meta; /* 8000000000000121 (KvdbSystem) - 8000000000000122 (KvdbUser) - 8000000000000124 (KvdbSdCard) */
 	} else if (key_size == 0x40) {
-		save_data_key_t save_data_key;
-		save_data_value_t save_data_value;
+		SaveData save_data;       /* 8000000000000000 (KvdbSaveData) */
 	}
-} kvdb_entry[kvdb_header.entry_count] <optimize=false>;
+} KvdbEntry;
+
+KvdbHeader kvdb_header;
+KvdbEntry kvdb_entry[kvdb_header.entry_count] <optimize=false>;
