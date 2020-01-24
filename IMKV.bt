@@ -211,7 +211,7 @@ typedef struct {
 	uint32 key_size;
 	uint32 value_size;
 	if (key_size == 0x10) {
-		ContentMeta content_meta; /* 8000000000000121 (KvdbSystem) - 8000000000000122 (KvdbUser) - 8000000000000124 (KvdbSdCard) */
+		ContentMeta content_meta; /* 8000000000000120 (KvdbSystem) - 8000000000000121 (KvdbUser) - 8000000000000124 (KvdbSdCard) */
 	} else if (key_size == 0x40) {
 		SaveData save_data;       /* 8000000000000000 (KvdbSaveData) */
 	}
