@@ -1,31 +1,32 @@
 LittleEndian();
 DisplayFormatHex();
 
-uint32 file_size;
+struct {
+	uint32 file_size;
+} settings_header;
 
 typedef enum <ubyte> {
-	VALUE_STRING = 1,
-	VALUE_FLAG,
-	VALUE_DATA
-} value_type_t;
+	ValueType_String = 1,
+	ValueType_Flag   = 2,
+	ValueType_Data   = 3
+} ValueType;
 
-typedef enum <ubyte> {
-	FLAG_FALSE,
-	FLAG_TRUE
-} flag_t;
-
-do {
+while (FTell() < settings_header.file_size) {
 	struct {
 		uint32 name_size;
-		char name[name_size];
-		value_type_t value_type;
+		char   name[name_size];
+		ValueType value_type;
 		uint32 value_size;
-		if (value_type == VALUE_STRING) {
-			char value[value_size];
-		} else if (value_type == VALUE_FLAG) {
-			flag_t value;
-		} else if (value_type == VALUE_DATA) {
-			uint32 value;
+		switch (value_type) {
+			case ValueType_String:
+				char   value[value_size];
+				break;
+			case ValueType_Flag:
+				ubyte  value;
+				break;
+			case ValueType_Data:
+				uint32 value;
+				break;
 		}
-	} setting_entry;
-} while (FTell() < file_size);
+	} settings_entry;
+}
