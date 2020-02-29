@@ -1,167 +1,161 @@
 LittleEndian();
 DisplayFormatHex();
 
-typedef enum <ubyte> {
-	DISTRIBUTION_DOWNLOAD,
-	DISTRIBUTION_GAME_CARD
-} distribution_type_t;
+local uint32 i, j, romfs_file_count;
+local uint64 header_offset;
 
 typedef enum <ubyte> {
-	CONTENT_PROGRAM,
-	CONTENT_META,
-	CONTENT_CONTROL,
-	CONTENT_MANUAL,
-	CONTENT_DATA,
-	CONTENT_PUBLIC_DATA,
-} content_type_t;
+	DistributionType_Download = 0,
+	DistributionType_GameCard = 1
+} DistributionType;
 
 typedef enum <ubyte> {
-	KAEK_INDEX_APPLICATION,
-	KAEK_INDEX_OCEAN,
-	KAEK_INDEX_SYSTEM
-} kaek_index_t;
+	ContentType_Program    = 0,
+	ContentType_Meta       = 1,
+	ContentType_Control    = 2,
+	ContentType_Manual     = 3,
+	ContentType_Data       = 4,
+	ContentType_PublicData = 5
+} ContentType;
 
 typedef enum <ubyte> {
-	ENTRY_DISABLED,
-	ENTRY_ENABLED
-} entry_flag_t;
-
-struct {
-	ubyte main_signature[0x100];
-	ubyte npdm_signature[0x100];
-	char magic[0x4];
-	if (magic != "NCA0" && magic != "NCA2" && magic != "NCA3") {
-		Warning("File is not decrypted.");
-		Exit(-1);
-	}
-	distribution_type_t distribution_type;
-	content_type_t content_type;
-	ubyte old_key_generation; // 0=1.0.0-2.3.0, 1=Unused, 2=3.0.0
-	kaek_index_t key_area_encryption_key_index;
-	uint64 content_size;
-	uint64 program_id;
-	uint32 content_index;
-	uint32 sdk_addon_version;
-	ubyte new_key_generation; // 3=3.0.1-3.0.2, 4=4.0.0-4.1.0, 5=5.0.0-5.1.0, 6=6.0.0-6.1.0, 7=6.2.0, 8=7.0.0-8.0.1, 9=8.1.0-8.1.1, A=9.0.0-9.0.1
-	ubyte padding_1[0xF];
-	ubyte rights_id[0x10];
-	struct {
-		uint32 start_offset; // start_offset * 0x200, offset >> 1
-		uint32 end_offset; // end_offset * 0x200, offset >> 1
-		entry_flag_t entry_flag;
-		ubyte padding_1[0x7];
-	} fs_entries[4];
-	struct {
-		ubyte fs_hash[0x20];
-	} fs_hashes[4];
-	struct {
-		ubyte encrypted_key[0x10];
-	} encrypted_keys[16];
-} nca_header;
+	KeyAreaEncryptionKeyIndex_Application = 0,
+	KeyAreaEncryptionKeyIndex_Ocean       = 1,
+	KeyAreaEncryptionKeyIndex_System      = 2
+} KeyAreaEncryptionKeyIndex;
 
 typedef enum <ubyte> {
-	FORMAT_ROMFS,
-	FORMAT_PARTITIONFS
-} format_type_t;
-
-typedef enum <ubyte> {
-	HASH_AUTO, // Not valid
-	HASH_NONE,
-	HASH_HIERARCHICAL_SHA256,
-	HASH_HIERARCHICAL_INTEGRITY
-} hash_type_t;
-
-typedef enum <ubyte> {
-	ENCRYPTION_AUTO, // Not valid
-	ENCRYPTION_NONE,
-	ENCRYPTION_AES_XTS,
-	ENCRYPTION_AES_CTR,
-	ENCRYPTION_AES_CTR_EX
-} encryption_type_t;
+	EntryStatus_Disabled = 0,
+	EntryStatus_Enabled  = 1
+} EntryStatus;
 
 typedef struct {
-	ubyte master_hash[0x20];
+	uint32 start_offset; /* start_offset * 0x200, offset >> 1 */
+	uint32 end_offset; /* end_offset * 0x200, offset >> 1 */
+	EntryStatus entry_status;
+	ubyte  reserved_1[0x7];
+} FsEntry;
+
+typedef struct {
+	ubyte hash[0x20];
+} FsHash;
+
+typedef struct {
+	ubyte key[0x10];
+} EncryptedKey;
+
+typedef enum <ubyte> {
+	FormatType_RomFs       = 0,
+	FormatType_PartitionFs = 1
+} FormatType;
+
+typedef enum <ubyte> {
+	HashType_None                  = 1,
+	HashType_HierarchicalSha256    = 2,
+	HashType_HierarchicalIntegrity = 3
+} HashType;
+
+typedef enum <ubyte> {
+	EncryptionType_None     = 1,
+	EncryptionType_AesXts   = 2,
+	EncryptionType_AesCtr   = 3,
+	EncryptionType_AesCtrEx = 4
+} EncryptionType;
+
+typedef struct {
+	ubyte  master_hash[0x20];
 	uint32 hash_block_size;
 	uint32 level_count;
 	uint64 hash_data_offset;
 	uint64 hash_data_size;
 	uint64 hash_target_offset;
 	uint64 hash_target_size;
-} hierarchical_sha256_t; // Used for PFS0 and NCA0 RomFS
+} HierarchicalSha256; /* Used for PartitionFs and NCA0 RomFs */
 
 typedef struct {
-	char magic[0x4];
+	char   magic[0x4];
 	uint32 version;
 	uint32 master_hash_size;
 	uint32 level_count;
 	struct {
 		uint64 hash_data_offset;
 		uint64 hash_data_size;
-		uint32 block_size; // 1 << block_size, log2(size)
-		uint32 padding_1;
+		uint32 block_size; /* 1 << block_size, log2(size) */
+		uint32 reserved_1;
 	} levels[level_count - 1];
-	ubyte salt_source[0x20];
-	ubyte master_hash[0x20];
-} hierarchical_integrity_t;
+	ubyte  salt_source[0x20];
+	ubyte  master_hash[master_hash_size];
+} HierarchicalIntegrity;
 
 typedef struct {
-	char magic[0x4];
+	char   magic[0x4];
 	uint32 bucket_count;
 	uint32 entry_count;
-	uint32 padding_1;
-} bktr_header_t;
+	uint32 reserved_1;
+} BktrHeader;
 
 typedef struct {
 	uint64 indirect_offset;
 	uint64 indirect_size;
-	bktr_header_t bktr_header;
-} indirect_header_t;
+	BktrHeader bktr_header;
+} IndirectHeader;
 
 typedef struct {
 	uint64 aes_ctr_ex_offset;
 	uint64 aes_ctr_ex_size;
-	bktr_header_t bktr_header;
-} aes_ctr_ex_header_t;
-
-struct {
-	uint16 version;
-	format_type_t format_type;
-	hash_type_t hash_type;
-	encryption_type_t encryption_type;
-	ubyte padding_1[0x3];
-	if (hash_type == HASH_HIERARCHICAL_SHA256) {
-		hierarchical_sha256_t hierarchical_sha256;
-		ubyte padding_2[0xF0];
-	} else if (hash_type == HASH_HIERARCHICAL_INTEGRITY) {
-		hierarchical_integrity_t hierarchical_integrity;
-		if (encryption_type == ENCRYPTION_AES_CTR_EX) {
-			ubyte padding_2[0x18];
-			indirect_header_t indirect_header;
-			aes_ctr_ex_header_t aes_ctr_ex_header;
-		} else {
-			ubyte padding_2[0x58];
-		}
-	} else {
-		ubyte padding_2[0x138];
-	}
-	uint32 generation;
-	uint32 secure_value; // Program = 1 (nca_fs_header[0]), 2 (nca_fs_header[1]) - Manual = 4 (HtmlDocument), 5 (LegalInformation)
-	ubyte padding_3[0xB8];
-} nca_fs_header[4] <optimize=false>;
+	BktrHeader bktr_header;
+} AesCtrExHeader;
 
 typedef struct {
-	char magic[0x4];
-	uint32 file_count;
-	uint32 name_table_size;
-	uint32 padding_1;
-	struct {
-		uint64 data_offset;
-		uint64 data_size;
-		uint32 name_table_offset;
-		uint32 padding_1;
-	} file_entry[file_count];
-	char name_table[name_table_size];
-} pfs0_header_t;
+	uint16 version;
+	FormatType format_type;
+	HashType hash_type;
+	EncryptionType encryption_type;
+	ubyte  reserved_1[0x3];
+	if (hash_type == HashType_HierarchicalSha256) {
+		HierarchicalSha256 hierarchical_sha256;
+		ubyte reserved_2[0xF0];
+	} else if (hash_type == HashType_HierarchicalIntegrity) {
+		HierarchicalIntegrity hierarchical_integrity;
+		if (encryption_type == EncryptionType_AesCtrEx) {
+			ubyte reserved_2[0x18];
+			IndirectHeader indirect_header;
+			AesCtrExHeader aes_ctr_ex_header;
+		} else {
+			ubyte reserved_2[0x58];
+		}
+	} else {
+		ubyte reserved_2[0x138];
+	}
+	uint32 generation;
+	uint32 secure_value; /* Program = 1 (nca_fs_headers[0]), 2 (nca_fs_headers[1]) - Manual = 4 (HtmlDocument), 5 (LegalInformation) */
+	ubyte  reserved_3[0xB8];
+} NcaFsHeader;
+
+struct {
+	ubyte  main_signature[0x100];
+	ubyte  npdm_signature[0x100];
+	char   magic[0x4];
+	if (magic != "NCA0" && magic != "NCA2" && magic != "NCA3") {
+		Warning("File is not decrypted or is not a valid NCA file.");
+		Exit(0);
+	}
+	DistributionType distribution_type;
+	ContentType content_type;
+	ubyte  old_key_generation; /* 0=1.0.0-2.3.0, 1=Unused, 2=3.0.0 */
+	KeyAreaEncryptionKeyIndex key_area_encryption_key_index;
+	uint64 content_size;
+	uint64 program_id;
+	uint32 content_index;
+	uint32 sdk_addon_version;
+	ubyte  new_key_generation; /* 3=3.0.1-3.0.2, 4=4.0.0-4.1.0, 5=5.0.0-5.1.0, 6=6.0.0-6.1.0, 7=6.2.0, 8=7.0.0-8.0.1, 9=8.1.0-8.1.1, 10=9.0.0-9.0.1, 11=9.1.0 */
+	ubyte  reserved_1[0xF];
+	ubyte  rights_id[0x10];
+	FsEntry fs_entries[4];
+	FsHash fs_hashes[4];
+	EncryptedKey encrypted_keys[16];
+	NcaFsHeader nca_fs_headers[4];
+} nca_header;
 
 typedef struct {
 	uint32 header_size;
@@ -174,7 +168,7 @@ typedef struct {
 	uint32 file_info_table_offset;
 	uint32 file_info_table_size;
 	uint32 data_offset;
-} nca0_romfs_header_t;
+} RomFsHeader1;
 
 typedef struct {
 	uint64 header_size;
@@ -187,7 +181,7 @@ typedef struct {
 	uint64 file_info_table_offset;
 	uint64 file_info_table_size;
 	uint64 data_offset;
-} romfs_header_t;
+} RomFsHeader2;
 
 typedef struct {
 	uint32 parent_directory_offset;
@@ -195,10 +189,16 @@ typedef struct {
 	uint32 child_directory_offset;
 	uint32 child_file_offset;
 	uint32 hash_offset;
-	uint32 name_length; // 0x300 limit
-	char name[name_length];
-	ubyte padding_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
-} romfs_directory_info_t;
+	uint32 name_length; /* 0x300 Limit */
+	char   name[name_length];
+	ubyte  reserved_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
+} RomFsDirectoryInfo;
+
+typedef struct {
+	while (FTell() < header_offset + romfs_header.directory_info_table_offset + romfs_header.directory_info_table_size) {
+		RomFsDirectoryInfo romfs_directory_info;
+	}
+} RomFsDirectoryInfoEntries;
 
 typedef struct {
 	uint32 parent_directory_offset;
@@ -206,113 +206,134 @@ typedef struct {
 	uint64 data_offset;
 	uint64 data_size;
 	uint32 hash_offset;
-	uint32 name_length; // 0x300 limit
-	char name[name_length];
-	ubyte padding_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
-} romfs_file_info_t;
+	uint32 name_length; /* 0x300 Limit */
+	char   name[name_length];
+	ubyte  reserved_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
+} RomFsFileInfo;
+
+typedef struct {
+	while (FTell() < header_offset + romfs_header.file_info_table_offset + romfs_header.file_info_table_size) {
+		RomFsFileInfo romfs_file_info;
+		romfs_file_count++;
+	}
+} RomFsFileInfoEntries;
+
+typedef struct {
+	ubyte file[romfs_file_info_entries.romfs_file_info[i].data_size];
+} RomFsFileDataEntry;
+
+typedef struct {
+	for (i = 0; i < romfs_file_count; i++) {
+		RomFsFileDataEntry romfs_file_data_entry;
+	}
+} RomFsFileDataEntries;
+
+typedef struct {
+	uint64 data_offset;
+	uint64 data_size;
+	uint32 string_table_offset;
+	uint32 reserved_1;
+} PartitionFsFileEntry;
+
+typedef struct {
+	char   magic[0x4];
+	uint32 file_count;
+	uint32 string_table_size;
+	uint32 reserved_1;
+	PartitionFsFileEntry file_entries[file_count];
+	char   string_table[string_table_size];
+} PartitionFsHeader;
+
+typedef struct {
+	ubyte file[partition_fs_header.file_entries[j].data_size];
+} PartitionFsFileDataEntry;
+
+typedef struct {
+	for (j = 0; j < partition_fs_header.file_count; j++) {
+		PartitionFsFileDataEntry partition_fs_file_data_entry;
+	}
+} PartitionFsFileDataEntries;
 
 typedef enum <uint32> {
-	INDEX_ORIGINAL,
-	INDEX_PATCH
-} indirect_storage_index_t;
+	IndirectStorageIndex_Original = 0,
+	IndirectStorageIndex_Patch    = 1
+} IndirectStorageIndex;
 
 typedef struct {
 	uint64 virtual_offset;
 	uint64 physical_offset;
-	indirect_storage_index_t indirect_storage_index;
-} indirect_storage_entry_t;
+	IndirectStorageIndex indirect_storage_index;
+} IndirectStorageEntry;
 
 typedef struct {
 	uint32 index;
 	uint32 entry_count;
 	uint64 end_offset;
-	indirect_storage_entry_t indirect_storage_entry[0x3FF0 / 0x14];
-	ubyte padding_1[0x3FF0 % 0x14];
-} indirect_storage_bucket_t;
+	IndirectStorageEntry indirect_storage_entry[0x3FF0 / 0x14];
+	ubyte  reserved_1[0x3FF0 % 0x14];
+} IndirectStorageBucket;
 
 typedef struct {
 	uint32 index;
 	uint32 bucket_count;
 	uint64 total_size;
 	uint64 virtual_offsets[0x3FF0 / 0x8];
-	indirect_storage_bucket_t indirect_storage_bucket[bucket_count];
-} indirect_storage_block_t;
+	IndirectStorageBucket indirect_storage_bucket[bucket_count];
+} IndirectStorageBlock;
 
 typedef struct {
 	uint64 offset;
 	uint32 generation;
 	uint32 secure_value;
-} aes_ctr_ex_storage_entry_t;
+} AesCtrExStorageEntry;
 
 typedef struct {
 	uint32 index;
 	uint32 entry_count;
 	uint64 end_offset;
-	aes_ctr_ex_storage_entry_t aes_ctr_ex_storage_entry[0x3FF];
-} aes_ctr_ex_storage_bucket_t;
+	AesCtrExStorageEntry aes_ctr_ex_storage_entry[0x3FF];
+} AesCtrExStorageBucket;
 
 typedef struct {
 	uint32 index;
 	uint32 bucket_count;
 	uint64 total_size;
 	uint64 physical_offsets[0x3FF0 / 0x8];
-	aes_ctr_ex_storage_bucket_t aes_ctr_ex_storage_bucket[bucket_count];
-} aes_ctr_ex_storage_block_t;
+	AesCtrExStorageBucket aes_ctr_ex_storage_bucket[bucket_count];
+} AesCtrExStorageBlock;
 
-local uint64 header_offset;
-local uint32 i, j, romfs_file_count;
 for (i = 0; i < 4; i++) {
-	if (nca_header.fs_entries[i].entry_flag) {
-		if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
+	if (nca_header.fs_entries[i].entry_status) {
+		if (nca_header.nca_fs_headers[i].format_type == FormatType_RomFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
 			if (nca_header.magic == "NCA0") {
-				header_offset = (nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
+				header_offset = (nca_header.fs_entries[i].start_offset * 0x200) + nca_header.nca_fs_headers[i].hierarchical_sha256.hash_target_offset;
 				FSeek(header_offset);
-				nca0_romfs_header_t romfs_header;
+				RomFsHeader1 romfs_header;
 			} else {
-				header_offset = (nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_integrity.levels[5].hash_data_offset;
+				header_offset = (nca_header.fs_entries[i].start_offset * 0x200) + nca_header.nca_fs_headers[i].hierarchical_integrity.levels[5].hash_data_offset;
 				FSeek(header_offset);
-				romfs_header_t romfs_header;
+				RomFsHeader2 romfs_header;
 			}
 			FSeek(header_offset + romfs_header.directory_hash_table_offset);
-			uint32 romfs_directory_hash_entries[romfs_header.directory_hash_table_size / 4];
-			struct {
-				while (FTell() < header_offset + romfs_header.directory_info_table_offset + romfs_header.directory_info_table_size) {
-					romfs_directory_info_t romfs_directory_info;
-				}
-			} romfs_directory_info_entries;
+			uint32 romfs_directory_hash_entries[romfs_header.directory_hash_table_size / 0x4];
+			RomFsDirectoryInfoEntries romfs_directory_info_entries;
 			FSeek(header_offset + romfs_header.file_hash_table_offset);
-			uint32 romfs_file_hash_entries[romfs_header.file_hash_table_size / 4];
-			struct {
-				while (FTell() < header_offset + romfs_header.file_info_table_offset + romfs_header.file_info_table_size) {
-					romfs_file_info_t romfs_file_info;
-					romfs_file_count++;
-				}
-			} romfs_file_info_entries;
+			uint32 romfs_file_hash_entries[romfs_header.file_hash_table_size / 0x4];
+			RomFsFileInfoEntries romfs_file_info_entries;
 			FSeek(header_offset + romfs_header.data_offset);
-			struct {
-				for (j = 0; j < romfs_file_count; j++) {
-					struct {
-						ubyte file[romfs_file_info_entries.romfs_file_info[j].data_size];
-					} romfs_file_entry;
-				}
-			} romfs_file_entries;
-		} else if (nca_fs_header[i].format_type == FORMAT_PARTITIONFS && nca_fs_header[i].encryption_type != ENCRYPTION_AES_CTR_EX) {
-			header_offset = (nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].hierarchical_sha256.hash_target_offset;
+			RomFsFileDataEntries romfs_file_data_entries;
+		} else if (nca_header.nca_fs_headers[i].format_type == FormatType_PartitionFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
+			header_offset = (nca_header.fs_entries[i].start_offset * 0x200) + nca_header.nca_fs_headers[i].hierarchical_sha256.hash_target_offset;
 			FSeek(header_offset);
-			pfs0_header_t pfs0_header;
-			FSeek(header_offset + sizeof(pfs0_header));
-			struct {
-				for (j = 0; j < pfs0_header.file_count; j++) {
-					struct {
-						ubyte file[pfs0_header.file_entry[j].data_size];
-					} pfs0_file_entry;
-				}
-			} pfs0_file_entries;
-		} else if (nca_fs_header[i].format_type == FORMAT_ROMFS && nca_fs_header[i].encryption_type == ENCRYPTION_AES_CTR_EX) {
-			FSeek((nca_header.fs_entries[i].start_offset * 0x200) + nca_fs_header[i].indirect_header.indirect_offset);
-			if (ReadUInt() != 0) break; // Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong
-			indirect_storage_block_t indirect_storage_block;
-			aes_ctr_ex_storage_block_t aes_ctr_ex_storage_block;
+			PartitionFsHeader partition_fs_header;
+			FSeek(header_offset + sizeof(partition_fs_header));
+			PartitionFsFileDataEntries partition_fs_file_data_entries;
+		} else if (nca_header.nca_fs_headers[i].format_type == FormatType_RomFs && nca_header.nca_fs_headers[i].encryption_type == EncryptionType_AesCtrEx) {
+			FSeek((nca_header.fs_entries[i].start_offset * 0x200) + nca_header.nca_fs_headers[i].indirect_header.indirect_offset);
+			if (ReadUInt() != 0) break; /* Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong - use hactoolnet instead */
+			IndirectStorageBlock indirect_storage_block;
+			AesCtrExStorageBlock aes_ctr_ex_storage_block;
+			/* TODO: Patch RomFs */
 		}
 	}
 }
