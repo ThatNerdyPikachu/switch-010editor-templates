@@ -1,7 +1,8 @@
 LittleEndian();
 DisplayFormatHex();
 
-local uint32 offset, i, j, id, descriptor, descriptor_start, descriptor_count, entry_number;
+local uint32 offset, i, j, descriptor_start, descriptor_count, descriptor, index, entry_number;
+local ubyte  io;
 
 typedef enum <ubyte> {
 	ProcessAddressSpace_AddressSpace32Bit           = 0,
@@ -270,6 +271,10 @@ void GetSystemCallId(uint32 id) {
 		case 125: uint32 SystemCallId_CreateResourceLimit            : 1; break;
 		case 126: uint32 SystemCallId_SetResourceLimitLimitValue     : 1; break;
 		case 127: uint32 SystemCallId_CallSecureMonitor              : 1; break;
+		default:
+			uint32 SystemCallId_Reserved1                            : 16;
+			j = 24;
+			break;
 	}
 }
 
@@ -277,7 +282,7 @@ typedef struct {
 	uint32 EnableSystemCalls_EntryNumber : 4;
 	uint32 EnableSystemCalls_Reserved1   : 1;
 	for (j = 0; j < 24; j++) {
-		GetSystemCallId(id + j);
+		GetSystemCallId((index * 24) + j);
 	}
 	uint32 EnableSystemCalls_Index       : 3;
 } EnableSystemCalls;
@@ -293,13 +298,17 @@ typedef enum <uint32> {
 } MappingType;
 
 typedef struct {
-	/* Is this being read correctly? */
-	uint32 MemoryMap_EntryNumber  : 6;
-	uint32 MemoryMap_Reserved1    : 1;
-	uint32 MemoryMap_BeginAddress : 24;
-	PermissionType MemoryMap_PermissionType : 1;
-	uint32 MemoryMap_Size         : 24;
-	MappingType MemoryMap_MappingType : 1;
+	uint32 MemoryMap_EntryNumber : 6;
+	uint32 MemoryMap_Reserved1   : 1;
+	if (!io) {
+		uint32 MemoryMap_BeginAddress : 24;
+		PermissionType MemoryMap_PermissionType : 1;
+		io = 1;
+	} else {
+		uint32 MemoryMap_Size         : 24;
+		MappingType MemoryMap_MappingType : 1;
+		io = 0;
+	}
 } MemoryMap;
 
 typedef struct {
@@ -375,22 +384,18 @@ typedef struct {
 	descriptor_count = parentof(this).kc.size / 0x4;
 	for (i = 0; i < descriptor_count; i++) {
 		descriptor = ReadUInt(descriptor_start + (i * 0x4));
+		index = descriptor >> 29;
 		entry_number = 0;
-		if (descriptor == 0xFFFFFFFF) {
-			continue;
-		}
 		while (descriptor & 1) {
 			descriptor >>= 1;
 			entry_number++;
 		}
-		descriptor >>= 1;
 		switch (entry_number) {
 			case 3:
 				ThreadInfo thread_info;
 				break;
 			case 4:
 				EnableSystemCalls enable_system_calls;
-				id += j;
 				break;
 			case 6:
 				MemoryMap memory_map;
