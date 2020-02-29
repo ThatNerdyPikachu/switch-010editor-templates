@@ -12,7 +12,7 @@ typedef struct {
 struct {
 	RoCrt ro_crt;
 	char  reserved_1[0x8]; /* "HOMEBREW */
-} nro_start;
+} mod_start;
 
 typedef struct {
 	uint32 memory_offset;
@@ -32,12 +32,12 @@ struct {
 	ubyte  module_id[0x20];
 	uint32 dso_handle_offset;
 	uint32 reserved_2;
-	SegmentHeader embedded; /* apiinfo */
+	SegmentHeader embedded; /* api_info */
 	SegmentHeader dyn_str;
 	SegmentHeader dyn_sym;
 } nro_header;
 
-FSeek(nro_start.ro_crt.mod_offset);
+FSeek(mod_start.ro_crt.mod_offset);
 struct {
 	char   magic[0x4];
 	uint32 dynamic_offset;
@@ -48,7 +48,7 @@ struct {
 	uint32 module_object_offset;
 } mod_header;
 
-if (nro_start.reserved_1 == "HOMEBREW") {
+if (mod_start.reserved_1 == "HOMEBREW") {
 	struct {
 		char   magic[0x4];
 		uint32 got_start_offset;
@@ -314,6 +314,12 @@ if (nro_start.reserved_1 == "HOMEBREW") {
 		} RomFsDirectoryInfo;
 		
 		typedef struct {
+			while (FTell() < header_offset + romfs_header.directory_info_table_offset + romfs_header.directory_info_table_size) {
+				RomFsDirectoryInfo romfs_directory_info;
+			}
+		} RomFsDirectoryInfoEntries;
+		
+		typedef struct {
 			uint32 parent_directory_offset;
 			uint32 sibling_file_offset;
 			uint64 data_offset;
@@ -325,12 +331,6 @@ if (nro_start.reserved_1 == "HOMEBREW") {
 		} RomFsFileInfo;
 		
 		typedef struct {
-			while (FTell() < header_offset + romfs_header.directory_info_table_offset + romfs_header.directory_info_table_size) {
-				RomFsDirectoryInfo romfs_directory_info;
-			}
-		} RomFsDirectoryInfoEntries;
-		
-		typedef struct {
 			while (FTell() < header_offset + romfs_header.file_info_table_offset + romfs_header.file_info_table_size) {
 				RomFsFileInfo romfs_file_info;
 				romfs_file_count++;
@@ -338,12 +338,14 @@ if (nro_start.reserved_1 == "HOMEBREW") {
 		} RomFsFileInfoEntries;
 		
 		typedef struct {
+			ubyte file[romfs_file_info_entries.romfs_file_info[i].data_size];
+		} RomFsFileDataEntry;
+		
+		typedef struct {
 			for (i = 0; i < romfs_file_count; i++) {
-				struct {
-					ubyte file[romfs_file_info_entries.romfs_file_info[i].data_size];
-				} romfs_file_entry;
+				RomFsFileDataEntry romfs_file_data_entry;
 			}
-		} RomFsFileEntries;
+		} RomFsFileDataEntries;
 		
 		struct {
 			RomFsHeader romfs_header;
@@ -355,7 +357,7 @@ if (nro_start.reserved_1 == "HOMEBREW") {
 			uint32 romfs_file_hash_entries[romfs_header.file_hash_table_size / 0x4];
 			RomFsFileInfoEntries romfs_file_info_entries;
 			FSeek(header_offset + romfs_header.data_offset);
-			RomFsFileEntries romfs_file_entries;
+			RomFsFileDataEntries romfs_file_data_entries;
 		} romfs;
 	}
 }
