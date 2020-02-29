@@ -1,0 +1,361 @@
+LittleEndian();
+DisplayFormatHex();
+
+local uint32 i, romfs_file_count;
+local uint64 header_offset;
+
+typedef struct {
+	uint32 entry_point_insn;
+	uint32 mod_offset;
+} RoCrt;
+
+struct {
+	RoCrt ro_crt;
+	char  reserved_1[0x8]; /* "HOMEBREW */
+} nro_start;
+
+typedef struct {
+	uint32 memory_offset;
+	uint32 size;
+} SegmentHeader;
+
+struct {
+	char   magic[0x4];
+	uint32 version;
+	uint32 size;
+	uint32 flags;
+	SegmentHeader text;
+	SegmentHeader ro;
+	SegmentHeader data;
+	uint32 bss_size;
+	uint32 reserved_1;
+	ubyte  module_id[0x20];
+	uint32 dso_handle_offset;
+	uint32 reserved_2;
+	SegmentHeader embedded; /* apiinfo */
+	SegmentHeader dyn_str;
+	SegmentHeader dyn_sym;
+} nro_header;
+
+FSeek(nro_start.ro_crt.mod_offset);
+struct {
+	char   magic[0x4];
+	uint32 dynamic_offset;
+	uint32 bss_start_offset;
+	uint32 bss_end_offset;
+	uint32 eh_frame_hdr_start_offset;
+	uint32 eh_frame_hdr_end_offset;
+	uint32 module_object_offset;
+} mod_header;
+
+if (nro_start.reserved_1 == "HOMEBREW") {
+	struct {
+		char   magic[0x4];
+		uint32 got_start_offset;
+		uint32 got_end_offset;
+	} lny_header;
+	
+	typedef struct {
+		uint64 offset;
+		uint64 size;
+	} AsetSegmentHeader;
+	
+	FSeek(nro_header.size);
+	struct {
+		char   magic[0x4];
+		uint32 version;
+		AsetSegmentHeader icon;
+		AsetSegmentHeader nacp;
+		AsetSegmentHeader romfs;
+	} aset_header;
+	
+	FSeek(nro_header.size + aset_header.icon.offset);
+	ubyte icon[aset_header.icon.size];
+	
+	FSeek(nro_header.size + aset_header.nacp.offset);
+	typedef struct {
+		ubyte name[0x200];
+		ubyte publisher[0x100];
+	} ApplicationTitle;
+
+	typedef enum <ubyte> {
+		StartupUserAccount_None                                       = 0,
+		StartupUserAccount_Required                                   = 1,
+		StartupUserAccount_RequiredWithNetworkServiceAccountAvailable = 2
+	} StartupUserAccount;
+
+	typedef enum <ubyte> {
+		UserAccountSwitchLock_Disable = 0,
+		UserAccountSwitchLock_Enable  = 1
+	} UserAccountSwitchLock;
+
+	typedef enum <ubyte> {
+		AddOnContentRegistrationType_AllOnLaunch = 0,
+		AddOnContentRegistrationType_OnDemand    = 1
+	} AddOnContentRegistrationType;
+
+	typedef enum <uint32> {
+		AttributeFlag_None                     = 0,
+		AttributeFlag_Demo                     = 1,
+		AttributeFlag_RetailInteractiveDisplay = 2
+	} AttributeFlag;
+
+	typedef struct {
+		ubyte SupportedLanguageFlag_AmericanEnglish      : 1;
+		ubyte SupportedLanguageFlag_BritishEnglish       : 1;
+		ubyte SupportedLanguageFlag_Japanese             : 1;
+		ubyte SupportedLanguageFlag_French               : 1;
+		ubyte SupportedLanguageFlag_German               : 1;
+		ubyte SupportedLanguageFlag_LatinAmericanSpanish : 1;
+		ubyte SupportedLanguageFlag_Spanish              : 1;
+		ubyte SupportedLanguageFlag_Italian              : 1;
+		ubyte SupportedLanguageFlag_Dutch                : 1;
+		ubyte SupportedLanguageFlag_CanadianFrench       : 1;
+		ubyte SupportedLanguageFlag_Portuguese           : 1;
+		ubyte SupportedLanguageFlag_Russian              : 1;
+		ubyte SupportedLanguageFlag_Korean               : 1;
+		ubyte SupportedLanguageFlag_TraditionalChinese   : 1;
+		ubyte SupportedLanguageFlag_SimplifiedChinese    : 1;
+	} SupportedLanguageFlag <size=0x4>;
+
+	typedef enum <uint32> {
+		ParentalControlFlag_None              = 0,
+		ParentalControlFlag_FreeCommunication = 1
+	} ParentalControlFlag;
+
+	typedef enum <ubyte> {
+		Screenshot_Allow = 0,
+		Screenshot_Deny  = 1
+	} Screenshot;
+
+	typedef enum <ubyte> {
+		VideoCapture_Disable = 0,
+		VideoCapture_Manual  = 1,
+		VideoCapture_Enable  = 2
+	} VideoCapture;
+
+	typedef enum <ubyte> {
+		DataLossConfirmation_None     = 0,
+		DataLossConfirmation_Required = 1
+	} DataLossConfirmation;
+
+	typedef enum <ubyte> {
+		PlayLogPolicy_All     = 0,
+		PlayLogPolicy_LogOnly = 1,
+		PlayLogPolicy_None    = 2
+	} PlayLogPolicy;
+
+	typedef struct {
+		ubyte cero;
+		ubyte gracgcrb;
+		ubyte gsrmr;
+		ubyte esrb;
+		ubyte class_ind;
+		ubyte usk;
+		ubyte pegi;
+		ubyte pegi_portugal;
+		ubyte pegibbfc;
+		ubyte russian;
+		ubyte acb;
+		ubyte oflc;
+		ubyte iarc_generic;
+		ubyte reserved_1[0x13];
+	} RatingAge;
+
+	typedef enum <ubyte> {
+		LogoType_LicensedByNintendo    = 0,
+		LogoType_DistributedByNintendo = 1,
+		LogoType_Nintendo              = 2
+	} LogoType;
+
+	typedef enum <ubyte> {
+		LogoHandling_Auto   = 0,
+		LogoHandling_Manual = 1
+	} LogoHandling;
+
+	typedef enum <ubyte> {
+		RuntimeAddOnContentInstall_Deny        = 0,
+		RuntimeAddOnContentInstall_AllowAppend = 1
+	} RuntimeAddOnContentInstall;
+
+	typedef enum <ubyte> {
+		RuntimeParameterDelivery_Always                   = 0,
+		RuntimeParameterDelivery_AlwaysIfUserStateMatched = 1,
+		RuntimeParameterDelivery_OnRestart                = 2
+	} RuntimeParameterDelivery;
+
+	typedef enum <ubyte> {
+		CrashReport_Deny  = 0,
+		CrashReport_Allow = 1
+	} CrashReport;
+
+	typedef enum <ubyte> {
+		Hdcp_None     = 0,
+		Hdcp_Required = 1
+	} Hdcp;
+
+	typedef enum <ubyte> {
+		StartupUserAccountOption_None       = 0,
+		StartupUserAccountOption_IsOptional = 1
+	} StartupUserAccountOption;
+
+	typedef enum <ubyte> {
+		PlayLogQueryCapability_None      = 0,
+		PlayLogQueryCapability_WhiteList = 1,
+		PlayLogQueryCapability_All       = 2
+	} PlayLogQueryCapability;
+
+	typedef enum <ubyte> {
+		RepairFlag_None                   = 0,
+		RepairFlag_SuppressGameCardAccess = 1
+	} RepairFlag;
+
+	typedef enum <ubyte> {
+		RequiredNetworkServiceLicenseOnLaunch_None   = 0,
+		RequiredNetworkServiceLicenseOnLaunch_Common = 1
+	} RequiredNetworkServiceLicenseOnLaunch;
+
+	typedef enum <uint64> {
+		JitConfigurationFlag_None    = 0,
+		JitConfigurationFlag_Enabled = 1
+	} JitConfigurationFlag;
+
+	typedef struct {
+		uint64 group_id;
+		ubyte  key[0x10];
+	} ApplicationNeighborDetectionGroupConfiguration;
+
+	typedef struct {
+		JitConfigurationFlag jit_configuration_flag;
+		uint64 memory_size;
+	} JitConfiguration;
+
+	struct {
+		ApplicationTitle application_titles[0x10];
+		char   isbn[0x25];
+		StartupUserAccount startup_user_account;
+		UserAccountSwitchLock user_account_switch_lock; /* Old: touch_screen_usage (None, Supported, Required) */
+		AddOnContentRegistrationType add_on_content_registration_type;
+		AttributeFlag attribute_flag;
+		SupportedLanguageFlag supported_language_flag;
+		ParentalControlFlag parental_control_flag;
+		Screenshot screenshot;
+		VideoCapture video_capture;
+		DataLossConfirmation data_loss_confirmation;
+		PlayLogPolicy play_log_policy;
+		uint64 presence_group_id;
+		RatingAge rating_ages;
+		char   display_version[0x10];
+		uint64 add_on_content_base_id;
+		uint64 save_data_owner_id;
+		uint64 user_account_save_data_size;
+		uint64 user_account_save_data_journal_size;
+		uint64 device_save_data_size;
+		uint64 device_save_data_journal_size;
+		uint64 bcat_delivery_cache_storage_size;
+		char   application_error_code_category[0x8];
+		uint64 local_communication_ids[0x8];
+		LogoType logo_type;
+		LogoHandling logo_handling;
+		RuntimeAddOnContentInstall runtime_add_on_content_install;
+		RuntimeParameterDelivery runtime_parameter_delivery;
+		ubyte  reserved_1[0x2];
+		CrashReport crash_report;
+		Hdcp   hdcp;
+		uint64 seed_for_pseudo_device_id;
+		char   bcat_passphrase[0x41];
+		StartupUserAccountOption startup_user_account_option;
+		ubyte  reserved_2[0x6];
+		uint64 user_account_save_data_size_max;
+		uint64 user_account_save_data_journal_size_max;
+		uint64 device_save_data_size_max;
+		uint64 device_save_data_journal_size_max;
+		uint64 temporary_storage_size;
+		uint64 cache_storage_size;
+		uint64 cache_storage_journal_size;
+		uint64 cache_storage_data_and_journal_size_max;
+		uint16 cache_storage_index_max;
+		ubyte  reserved_3[0x6];
+		uint64 play_log_queryable_application_ids[0x10];
+		PlayLogQueryCapability play_log_query_capability;
+		RepairFlag repair_flag;
+		ubyte  program_index;
+		RequiredNetworkServiceLicenseOnLaunch required_network_service_license_on_launch;
+		uint32 reserved_4;
+		ApplicationNeighborDetectionGroupConfiguration send_group_configuration;
+		ApplicationNeighborDetectionGroupConfiguration receivable_group_configurations[0x10];
+		JitConfiguration jit_configuration;
+		ubyte  reserved_5[0xC40];
+	} nacp;
+	
+	if (aset_header.romfs.size > 0) {
+		typedef struct {
+			uint64 header_size;
+			uint64 directory_hash_table_offset;
+			uint64 directory_hash_table_size;
+			uint64 directory_info_table_offset;
+			uint64 directory_info_table_size;
+			uint64 file_hash_table_offset;
+			uint64 file_hash_table_size;
+			uint64 file_info_table_offset;
+			uint64 file_info_table_size;
+			uint64 data_offset;
+		} RomFsHeader;
+		
+		typedef struct {
+			uint32 parent_directory_offset;
+			uint32 sibling_directory_offset;
+			uint32 child_directory_offset;
+			uint32 child_file_offset;
+			uint32 hash_offset;
+			uint32 name_length; /* 0x300 Limit */
+			char   name[name_length];
+			ubyte  reserved_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
+		} RomFsDirectoryInfo;
+		
+		typedef struct {
+			uint32 parent_directory_offset;
+			uint32 sibling_file_offset;
+			uint64 data_offset;
+			uint64 data_size;
+			uint32 hash_offset;
+			uint32 name_length; /* 0x300 Limit */
+			char   name[name_length];
+			ubyte  reserved_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
+		} RomFsFileInfo;
+		
+		typedef struct {
+			while (FTell() < header_offset + romfs_header.directory_info_table_offset + romfs_header.directory_info_table_size) {
+				RomFsDirectoryInfo romfs_directory_info;
+			}
+		} RomFsDirectoryInfoEntries;
+		
+		typedef struct {
+			while (FTell() < header_offset + romfs_header.file_info_table_offset + romfs_header.file_info_table_size) {
+				RomFsFileInfo romfs_file_info;
+				romfs_file_count++;
+			}
+		} RomFsFileInfoEntries;
+		
+		typedef struct {
+			for (i = 0; i < romfs_file_count; i++) {
+				struct {
+					ubyte file[romfs_file_info_entries.romfs_file_info[i].data_size];
+				} romfs_file_entry;
+			}
+		} RomFsFileEntries;
+		
+		struct {
+			RomFsHeader romfs_header;
+			header_offset = nro_header.size + aset_header.romfs.offset;
+			FSeek(header_offset + romfs_header.directory_hash_table_offset);
+			uint32 romfs_directory_hash_entries[romfs_header.directory_hash_table_size / 0x4];
+			RomFsDirectoryInfoEntries romfs_directory_info_entries;
+			FSeek(header_offset + romfs_header.file_hash_table_offset);
+			uint32 romfs_file_hash_entries[romfs_header.file_hash_table_size / 0x4];
+			RomFsFileInfoEntries romfs_file_info_entries;
+			FSeek(header_offset + romfs_header.data_offset);
+			RomFsFileEntries romfs_file_entries;
+		} romfs;
+	}
+}
