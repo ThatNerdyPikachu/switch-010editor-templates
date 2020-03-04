@@ -1,7 +1,7 @@
 LittleEndian();
 DisplayFormatHex();
 
-local uint32 offset, i, j, descriptor_start, descriptor_count, descriptor, index, entry_number;
+local uint32 offset, i, j, descriptor_start, descriptor_count, descriptor, entry_number, index;
 local ubyte  io;
 
 typedef enum <ubyte> {
@@ -24,8 +24,8 @@ typedef struct {
 
 struct {
 	char   magic[0x4];
-	uint32 key_generation;
-	uint32 reserved_1;
+	ubyte  acid_signature_key_generation;
+	ubyte  reserved_1[0x7];
 	MetaFlags flags;
 	ubyte  reserved_2;
 	ubyte  main_thread_priority;
@@ -143,7 +143,7 @@ typedef struct {
 
 void GetSystemCallId(uint32 id) {
 	switch (id) {
-		case 0:   uint32 SystemCallId_Unknown1                       : 1; break;
+		case 0:   uint32 SystemCallId_Unknown0                       : 1; break;
 		case 1:   uint32 SystemCallId_SetHeapSize                    : 1; break;
 		case 2:	  uint32 SystemCallId_SetMemoryPermission            : 1; break;
 		case 3:   uint32 SystemCallId_SetMemoryAttribute             : 1; break;
@@ -384,7 +384,6 @@ typedef struct {
 	descriptor_count = parentof(this).kc.size / 0x4;
 	for (i = 0; i < descriptor_count; i++) {
 		descriptor = ReadUInt(descriptor_start + (i * 0x4));
-		index = descriptor >> 29;
 		entry_number = 0;
 		while (descriptor & 1) {
 			descriptor >>= 1;
@@ -395,6 +394,7 @@ typedef struct {
 				ThreadInfo thread_info;
 				break;
 			case 4:
+				index = descriptor >> 25;
 				EnableSystemCalls enable_system_calls;
 				break;
 			case 6:
