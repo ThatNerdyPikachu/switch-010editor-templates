@@ -16,8 +16,8 @@ typedef struct {
 
 struct {
 	char   magic[0x4];
-	uint32 key_generation;
-	ubyte  reserved_1[0x8];
+	ubyte  cert_signature_key_generation;
+	ubyte  reserved_1[0xB];
 	Certification certification;
 	ubyte  signature[0x100];
 	uint64 application_id;
