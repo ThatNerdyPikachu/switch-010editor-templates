@@ -1,8 +1,8 @@
 LittleEndian();
 DisplayFormatHex();
 
-local uint32 offset, i, j, descriptor_start, descriptor_count, descriptor, entry_number, index;
-local ubyte  io;
+local uint32 offset, target, i, j, descriptor_start, descriptor_count, descriptor, entry_number, index;
+local ubyte  page;
 
 typedef enum <ubyte> {
 	ProcessAddressSpace_AddressSpace32Bit           = 0,
@@ -20,7 +20,7 @@ typedef struct {
 typedef struct {
 	uint32 offset;
 	uint32 size;
-} NpdmSection;
+} SectionHeader;
 
 struct {
 	char   magic[0x4];
@@ -37,8 +37,8 @@ struct {
 	char   name[0x10];
 	char   product_code[0x10];
 	ubyte  reserved_4[0x30];
-	NpdmSection aci;
-	NpdmSection acid;
+	SectionHeader aci;
+	SectionHeader acid;
 } meta_header;
 
 typedef enum <uint32> {
@@ -107,12 +107,8 @@ typedef struct {
 	uint64 content_owner_id_max;
 	uint64 save_data_owner_id_min;
 	uint64 save_data_owner_id_max;
-	if (content_owner_id_count > 0) {
-		uint64 content_owner_id[content_owner_id_count];
-	}
-	if (save_data_owner_id_count > 0) {
-		uint64 save_data_owner_id[save_data_owner_id_count];
-	}
+	uint64 content_owner_ids[content_owner_id_count];
+	uint64 save_data_owner_ids[save_data_owner_id_count];
 } FacDescriptor;
 
 typedef struct {
@@ -300,21 +296,22 @@ typedef enum <uint32> {
 typedef struct {
 	uint32 MemoryMap_EntryNumber : 6;
 	uint32 MemoryMap_Reserved1   : 1;
-	if (!io) {
-		uint32 MemoryMap_BeginAddress : 24;
+	if (!page) {
+		uint32 MemoryMap_BeginAddress : 24; /* begin_address << 12 */
 		PermissionType MemoryMap_PermissionType : 1;
-		io = 1;
+		page = 1;
 	} else {
-		uint32 MemoryMap_Size         : 24;
+		uint32 MemoryMap_Size         : 20; /* size << 12 */
+		uint32 MemoryMap_Reserved2    : 4;
 		MappingType MemoryMap_MappingType : 1;
-		io = 0;
+		page = 0;
 	}
 } MemoryMap;
 
 typedef struct {
 	uint32 IoMemoryMap_EntryNumber  : 7;
 	uint32 IoMemoryMap_Reserved1    : 1;
-	uint32 IoMemoryMap_BeginAddress : 24;
+	uint32 IoMemoryMap_BeginAddress : 24; /* begin_address << 12 */
 } IoMemoryMap;
 
 typedef enum <uint32> {
@@ -367,16 +364,11 @@ typedef struct {
 	uint32 HandleTableSize_HandleTableSize : 10;
 } HandleTableSize;
 
-typedef enum <uint32> {
-	Debug_False = 0,
-	Debug_True  = 1
-} Debug;
-
 typedef struct {
 	uint32 MiscFlags_EntryNumber : 16;
 	uint32 MiscFlags_Reserved1   : 1;
-	Debug  MiscFlags_EnableDebug : 1;
-	Debug  MiscFlags_ForceDebug  : 1;
+	uint32 MiscFlags_EnableDebug : 1;
+	uint32 MiscFlags_ForceDebug  : 1;
 } MiscFlags;
 
 typedef struct {
@@ -436,9 +428,9 @@ struct {
 	AcidFlags flags;
 	uint64 program_id_min;
 	uint64 program_id_max;
-	NpdmSection fac;
-	NpdmSection sac;
-	NpdmSection kc;
+	SectionHeader fac;
+	SectionHeader sac;
+	SectionHeader kc;
 	uint64 reserved_2;
 	FacDescriptor fac_descriptor;
 	FSeek(meta_header.acid.offset + sac.offset);
@@ -461,14 +453,16 @@ typedef struct {
 	uint32 content_owner_info_size;
 	uint32 save_data_owner_info_offset;
 	uint32 save_data_owner_info_size;
-	if (content_owner_info_size > 0) {
+	if (content_owner_info_size != 0) {
 		uint32 content_owner_id_count;
-		uint64 content_owner_id[content_owner_id_count];
+		uint64 content_owner_ids[content_owner_id_count];
 	}
-	if (save_data_owner_info_size > 0) {
+	if (save_data_owner_info_size != 0) {
 		uint32 save_data_owner_id_count;
-		Accessibility accessibility;
-		uint64 save_data_owner_id[save_data_owner_id_count];
+		Accessibility accessibilities[save_data_owner_id_count];
+		target = save_data_owner_info_offset + 0x4 + (save_data_owner_id_count * 0x1);
+		ubyte  reserved_2[((target + 0x3) & ~0x3) - target];
+		uint64 save_data_owner_ids[save_data_owner_id_count];
 	}
 } FacData;
 
@@ -479,9 +473,9 @@ struct {
 	ubyte  reserved_1[0xC];
 	uint64 program_id;
 	uint64 reserved_2;
-	NpdmSection fac;
-	NpdmSection sac;
-	NpdmSection kc;
+	SectionHeader fac;
+	SectionHeader sac;
+	SectionHeader kc;
 	uint64 reserved_3;
 	FacData fac_data;
 	FSeek(meta_header.aci.offset + sac.offset);
