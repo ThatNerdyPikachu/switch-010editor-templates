@@ -18,7 +18,7 @@ typedef enum <ubyte> {
 
 typedef enum <ubyte> {
 	ContentInstallType_Full         = 0,
-	ContentInstallType_FragmentOnly = 1,
+	ContentInstallType_FragmentOnly = 1
 } ContentInstallType;
 
 typedef struct {
@@ -92,10 +92,11 @@ typedef enum <ubyte> {
 } ContentType;
 
 typedef struct {
-	ubyte content_id[0x10];
-	ubyte size[0x6];
+	ubyte  content_id[0x10];
+	uint32 size_low;
+	uint16 size_high;
 	ContentType content_type;
-	ubyte id_offset;
+	ubyte  id_offset;
 } ContentInfo;
 
 typedef struct {
@@ -103,7 +104,7 @@ typedef struct {
 	uint32 version;
 	ContentMetaType content_meta_type;
 	ContentMetaAttribute content_meta_attribute;
-	uint16 padding;
+	uint16 reserved_1;
 } ContentMetaInfo;
 
 typedef struct {
@@ -166,9 +167,9 @@ typedef struct {
 typedef enum <ubyte> {
 	SaveDataSpaceId_BuiltInSystem = 0,
 	SaveDataSpaceId_BuiltInUser   = 1,
-	SaveDataSpaceId_SdSystem      = 2,
+	SaveDataSpaceId_SdCardSystem  = 2,
 	SaveDataSpaceId_Temporary     = 3,
-	SaveDataSpaceId_SdCache       = 4,
+	SaveDataSpaceId_SdCardCache   = 4,
 	SaveDataSpaceId_ProperSystem  = 100,
 	SaveDataSpaceId_SafeMode      = 101,
 	SaveDataSpaceId_BisAuto       = 127
@@ -210,6 +211,6 @@ struct {
 	if (key_size == 0x10) {
 		ContentMeta content_meta; /* 8000000000000120 (BuiltInSystem) - 8000000000000121 (BuiltInUser) - 8000000000000124 (SdCard) */
 	} else if (key_size == 0x40) {
-		SaveData save_data;       /* 8000000000000000 (SaveData) */
+		SaveData save_data;       /* 8000000000000000 */
 	}
 } kvdb_entry[kvdb_header.entry_count] <optimize=false>;
