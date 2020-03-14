@@ -19,88 +19,74 @@ typedef struct {
 typedef struct {
 	uint32 offset;
 	uint32 size;
-} SecondarySegmentHeader;
+} SectionHeader;
 
 struct {
 	char   magic[0x4];
 	uint32 version;
 	uint32 reserved_1;
 	Flags  flags;
-	SegmentHeader text;
+	SegmentHeader text_segment_header;
 	uint32 module_name_offset;
-	SegmentHeader ro;
+	SegmentHeader ro_segment_header;
 	uint32 module_name_size;
-	SegmentHeader data;
+	SegmentHeader data_segment_header;
 	uint32 bss_size;
 	ubyte  module_id[0x20];
 	uint32 text_file_size;
 	uint32 ro_file_size;
 	uint32 data_file_size;
 	ubyte  reserved_2[0x1C];
-	SecondarySegmentHeader embedded; /* api_info */
-	SecondarySegmentHeader dyn_str;
-	SecondarySegmentHeader dyn_sym;
+	SectionHeader embedded_section_header; /* api_info */
+	SectionHeader dyn_str_section_header;
+	SectionHeader dyn_sym_section_header;
 	ubyte  text_hash[0x20];
 	ubyte  ro_hash[0x20];
 	ubyte  data_hash[0x20];
 } nso_header;
 
-typedef struct {
-	uint32 entry_point_insn;
-	uint32 mod_offset;
-} RoCrt;
+struct {
+	FSeek(nso_header.text_segment_header.file_offset);
+	ubyte text_segment[nso_header.text_file_size];
+	FSeek(nso_header.ro_segment_header.file_offset);
+	ubyte ro_segment[nso_header.ro_file_size];
+	FSeek(nso_header.data_segment_header.file_offset);
+	ubyte data_segment[nso_header.data_file_size];
+} nso_body;
 
-typedef struct {
-	RoCrt ro_crt;
-	if (entry_point_insn > 0) { /* Libnx NSO */
-		char reserved_1[0x8]; /* "HOMEBREW" */
+if (!nso_header.flags.Flags_TextCompress) {
+	FSeek(nso_header.text_segment_header.file_offset);
+	if (nso_header.module_name_offset == 0x100 && nso_header.module_name_size != 0) {
+		struct {
+			ubyte name_size;
+			char  name[name_size];
+		} module_name;
 	}
-} ModStart;
-
-typedef struct {
-	char   magic[0x4];
-	uint32 dynamic_offset;
-	uint32 bss_start_offset;
-	uint32 bss_end_offset;
-	uint32 eh_frame_hdr_start_offset;
-	uint32 eh_frame_hdr_end_offset;
-	uint32 module_object_offset;
-} ModHeader;
-
-if (nso_header.module_name_offset == 0x100 && nso_header.module_name_size > 0) { /* Application NSO */
-	FSeek(nso_header.module_name_offset);
+	
+	typedef struct {
+		uint32 entry_point_insn;
+		uint32 mod_offset;
+	} RoCrt;
+	
 	struct {
-		ubyte name_length;
-		char  name[name_length];
-	} module_name;
-
-	if (nso_header.flags.Flags_TextCompress & nso_header.flags.Flags_RoCompress & nso_header.flags.Flags_DataCompress) {
-		FSkip(0x2); /* Unknown */
-	}
-	
-	if (FileNameGetBase(GetFileName(), false) != "rtld") {
-		ModStart mod_start;
-		ModHeader mod_header;
-	}
-} else { /* Hactool/Libnx NSO */
-	if (!nso_header.flags.Flags_TextCompress & !nso_header.flags.Flags_RoCompress & !nso_header.flags.Flags_DataCompress) {
-		ModStart mod_start;
-		
-		if (FileNameGetBase(GetFileName(), false) != "rtld") {
-			FSeek(0x100 + mod_start.ro_crt.mod_offset);
-			ModHeader mod_header;
+		RoCrt ro_crt;
+		if (ReadString(FTell(), 0x8) == "HOMEBREW") {
+			char reserved_1[0x8];
 		}
-	} else {
-		FSkip(0x2);
-		ModStart mod_start;
-		
-		if (FileNameGetBase(GetFileName(), false) != "rtld") {
-			FSeek(0x1C8);
-			ModHeader mod_header;
-		}
-	}
+	} mod_start;
 	
-	if (mod_start.ro_crt.entry_point_insn != 0) {
+	FSeek(nso_header.text_segment_header.file_offset + mod_start.ro_crt.mod_offset);
+	struct {
+		char   magic[0x4];
+		uint32 dynamic_offset;
+		uint32 bss_start_offset;
+		uint32 bss_end_offset;
+		uint32 eh_frame_hdr_start_offset;
+		uint32 eh_frame_hdr_end_offset;
+		uint32 module_object_offset;
+	} mod_header;
+	
+	if (exists(mod_start.reserved_1)) {
 		struct {
 			char   magic[0x4];
 			uint32 got_start_offset;
