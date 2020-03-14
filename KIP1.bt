@@ -1,8 +1,8 @@
 LittleEndian();
 DisplayFormatHex();
 
-local uint32 offset, i, j, descriptor_start, descriptor_count, descriptor, index, entry_number;
-local ubyte  io;
+local uint32 i, j, descriptor_start, descriptor_count, descriptor, entry_number, index;
+local ubyte  page;
 
 typedef enum <ubyte> {
 	ProcessAddressSpace_AddressSpace32Bit = 0,
@@ -10,18 +10,18 @@ typedef enum <ubyte> {
 } ProcessAddressSpace;
 
 typedef struct {
-	ubyte Flags_TextCompress           : 1;
-	ubyte Flags_RoCompress             : 1;
-	ubyte Flags_DataCompress           : 1;
-	ubyte Flags_Is64BitInstruction     : 1;
+	ubyte Flags_TextCompress       : 1;
+	ubyte Flags_RoCompress         : 1;
+	ubyte Flags_DataCompress       : 1;
+	ubyte Flags_Is64BitInstruction : 1;
 	ProcessAddressSpace Flags_ProcessAddressSpace : 1;
-	ubyte Flags_UseSystemPoolPartition : 1;
+	ubyte Flags_UseSecureMemory    : 1;
 } Flags;
 
 typedef struct {
-	uint32 offset;
-	uint32 decompressed_size;
-	uint32 compressed_size;
+	uint32 memory_offset;
+	uint32 size;
+	uint32 file_size;
 } SegmentHeader;
 
 typedef struct {
@@ -35,7 +35,7 @@ typedef struct {
 
 void GetSystemCallId(uint32 id) {
 	switch (id) {
-		case 0:   uint32 SystemCallId_Unknown1                       : 1; break;
+		case 0:   uint32 SystemCallId_Unknown0                       : 1; break;
 		case 1:   uint32 SystemCallId_SetHeapSize                    : 1; break;
 		case 2:	  uint32 SystemCallId_SetMemoryPermission            : 1; break;
 		case 3:   uint32 SystemCallId_SetMemoryAttribute             : 1; break;
@@ -192,21 +192,22 @@ typedef enum <uint32> {
 typedef struct {
 	uint32 MemoryMap_EntryNumber : 6;
 	uint32 MemoryMap_Reserved1   : 1;
-	if (!io) {
-		uint32 MemoryMap_BeginAddress : 24;
+	if (!page) {
+		uint32 MemoryMap_BeginAddress : 24; /* begin_address << 12 */
 		PermissionType MemoryMap_PermissionType : 1;
-		io = 1;
+		page = 1;
 	} else {
-		uint32 MemoryMap_Size         : 24;
+		uint32 MemoryMap_Size         : 20; /* size << 12 */
+		uint32 MemoryMap_Reserved2    : 4;
 		MappingType MemoryMap_MappingType : 1;
-		io = 0;
+		page = 0;
 	}
 } MemoryMap;
 
 typedef struct {
 	uint32 IoMemoryMap_EntryNumber  : 7;
 	uint32 IoMemoryMap_Reserved1    : 1;
-	uint32 IoMemoryMap_BeginAddress : 24;
+	uint32 IoMemoryMap_BeginAddress : 24; /* begin_address << 12 */
 } IoMemoryMap;
 
 typedef enum <uint32> {
@@ -259,16 +260,11 @@ typedef struct {
 	uint32 HandleTableSize_HandleTableSize : 10;
 } HandleTableSize;
 
-typedef enum <uint32> {
-	Debug_False = 0,
-	Debug_True  = 1
-} Debug;
-
 typedef struct {
 	uint32 MiscFlags_EntryNumber : 16;
 	uint32 MiscFlags_Reserved1   : 1;
-	Debug  MiscFlags_EnableDebug : 1;
-	Debug  MiscFlags_ForceDebug  : 1;
+	uint32 MiscFlags_EnableDebug : 1;
+	uint32 MiscFlags_ForceDebug  : 1;
 } MiscFlags;
 
 typedef struct {
@@ -276,7 +272,6 @@ typedef struct {
 	descriptor_count = 0x80 / 0x4;
 	for (i = 0; i < descriptor_count; i++) {
 		descriptor = ReadUInt(descriptor_start + (i * 0x4));
-		index = descriptor >> 29;
 		entry_number = 0;
 		if (descriptor == 0xFFFFFFFF) {
 			ubyte reserved_1[(descriptor_count * 0x4) - (i * 0x4)];
@@ -291,6 +286,7 @@ typedef struct {
 				ThreadInfo thread_info;
 				break;
 			case 4:
+				index = descriptor >> 25;
 				EnableSystemCalls enable_system_calls;
 				break;
 			case 6:
@@ -328,15 +324,39 @@ struct {
 	uint32 version;
 	ubyte  main_thread_priority;
 	ubyte  main_thread_core_number;
-	ubyte  padding_1;
+	ubyte  reserved_1;
 	Flags  flags;
-	SegmentHeader text;
-	uint32 padding_2;
-	SegmentHeader ro;
+	SegmentHeader text_segment_header;
+	uint32 main_thread_affinity_mask;
+	SegmentHeader ro_segment_header;
 	uint32 main_thread_stack_size;
-	SegmentHeader data;
-	uint32 padding_3;
-	SegmentHeader bss;
-	ubyte  padding_4[0x24];
+	SegmentHeader data_segment_header;
+	uint32 reserved_2;
+	SegmentHeader bss_segment_header;
+	ubyte  reserved_3[0x24];
 	KcData kc_data;
-} kip1_header;
+} kip_header;
+
+typedef struct {
+	uint32 compressed_size;
+	uint32 footer_size;
+	uint32 additional_size;
+} SegmentFooter;
+
+struct {
+	ubyte text_segment[kip_header.text_segment_header.file_size];
+	if (kip_header.flags.Flags_TextCompress) {
+		FSeek(startof(text_segment) + kip_header.text_segment_header.file_size - 0xC);
+		SegmentFooter text_segment_footer;
+	}
+	ubyte ro_segment[kip_header.ro_segment_header.file_size];
+	if (kip_header.flags.Flags_RoCompress) {
+		FSeek(startof(ro_segment) + kip_header.ro_segment_header.file_size - 0xC);
+		SegmentFooter ro_segment_footer;
+	}
+	ubyte data_segment[kip_header.data_segment_header.file_size];
+	if (kip_header.flags.Flags_DataCompress) {
+		FSeek(startof(data_segment) + kip_header.data_segment_header.file_size - 0xC);
+		SegmentFooter data_segment_footer;
+	}
+} kip_body;
