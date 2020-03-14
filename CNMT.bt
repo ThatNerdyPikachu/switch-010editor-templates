@@ -1,7 +1,6 @@
 LittleEndian();
 DisplayFormatHex();
 
-local uint16 content_meta_count, fragment_indicator_count;
 local uint32 extended_data_size, i;
 
 typedef enum <ubyte> {
@@ -16,23 +15,25 @@ typedef enum <ubyte> {
 	ContentMetaType_Delta                = 131
 } ContentMetaType;
 
-typedef enum <ubyte> {
-	ContentInstallType_Full         = 0,
-	ContentInstallType_FragmentOnly = 1,
-} ContentInstallType;
-
-typedef struct {
-	uint64 id;
-	uint32 version;
-	ContentMetaType content_meta_type;
-	ContentInstallType content_install_type;
-	uint16 reserved_1;
-} ContentMetaKey;
-
 typedef struct {
 	ubyte ContentMetaAttribute_IncludesExFatDriver : 1;
 	ubyte ContentMetaAttribute_Rebootless          : 1;
 } ContentMetaAttribute;
+
+typedef enum <ubyte> {
+	StorageId_None          = 0,
+	StorageId_Host          = 1,
+	StorageId_GameCard      = 2,
+	StorageId_BuiltInSystem = 3,
+	StorageId_BuiltInUser   = 4,
+	StorageId_SdCard        = 5,
+	StorageId_Any           = 6
+} StorageId;
+
+typedef enum <ubyte> {
+	ContentInstallType_Full         = 0,
+	ContentInstallType_FragmentOnly = 1
+} ContentInstallType;
 
 typedef struct {
 	uint64 id;
@@ -43,7 +44,9 @@ typedef struct {
 	uint16 content_count;
 	uint16 content_meta_count;
 	ContentMetaAttribute content_meta_attribute;
-	ubyte  reserved_2[0x3];
+	StorageId storage_id;
+	ContentInstallType content_install_type;
+	ubyte  reserved_2;
 	uint32 required_download_system_version;
 	uint32 reserved_3;
 } PackagedContentMetaHeader;
@@ -88,14 +91,15 @@ typedef enum <ubyte> {
 } ContentType;
 
 typedef struct {
-	ubyte content_id[0x10];
-	ubyte size[0x6];
+	ubyte  content_id[0x10];
+	uint32 size_low;
+	uint16 size_high;
 	ContentType content_type;
-	ubyte id_offset;
+	ubyte  id_offset;
 } ContentInfo;
 
 typedef struct {
-	ubyte hash[0x20];
+	ubyte digest[0x20];
 	ContentInfo content_info;
 } PackagedContentInfo;
 
@@ -113,17 +117,12 @@ typedef struct {
 } SystemUpdateMetaExtendedDataHeader;
 
 typedef struct {
-	uint32 firmware_variation;
+	uint32 firmware_variation_id;
 	ubyte  reserved_1[0x1C];
 } FirmwareVariationInfo1;
 
-typedef enum <ubyte> {
-	ReferToBase_False = 0,
-	ReferToBase_True  = 1
-} ReferToBase;
-
 typedef struct {
-	ReferToBase refer_to_base;
+	ubyte  refer_to_base;
 	ubyte  reserved_1[0x3];
 	uint32 meta_count;
 	ubyte  reserved_2[0x18];
@@ -132,14 +131,15 @@ typedef struct {
 typedef struct {
 	SystemUpdateMetaExtendedDataHeader system_update_meta_extended_data_header;
 	if (system_update_meta_extended_data_header.version == 1) {
-		FirmwareVariationInfo1 firmware_variation_info_1[system_update_meta_extended_data_header.variation_count];
+		FirmwareVariationInfo1 firmware_variation_info[system_update_meta_extended_data_header.variation_count];
 	} else if (system_update_meta_extended_data_header.version == 2) {
-		uint32 firmware_variation_id[system_update_meta_extended_data_header.variation_count];
-		FirmwareVariationInfo2 firmware_variation_info_2[system_update_meta_extended_data_header.variation_count];
+		uint32 firmware_variation_ids[system_update_meta_extended_data_header.variation_count];
+		FirmwareVariationInfo2 firmware_variation_info[system_update_meta_extended_data_header.variation_count];
 		for (i = 0; i < system_update_meta_extended_data_header.variation_count; i++) {
-			content_meta_count += firmware_variation_info_2[i].meta_count;
+			if (!firmware_variation_info[i].refer_to_base) {
+				ContentMetaInfo content_meta_info[firmware_variation_info[i].meta_count];
+			}
 		}
-		ContentMetaInfo content_meta_info[content_meta_count];
 	}
 } SystemUpdateMetaExtendedData;
 
@@ -152,6 +152,14 @@ typedef struct {
 	uint32 delta_content_count;
 	uint32 reserved_1;
 } PatchMetaExtendedDataHeader;
+
+typedef struct {
+	uint64 id;
+	uint32 version;
+	ContentMetaType content_meta_type;
+	ContentInstallType content_install_type;
+	uint16 reserved_1;
+} ContentMetaKey;
 
 typedef struct {
 	ContentMetaKey content_meta_key;
@@ -183,8 +191,10 @@ typedef enum <ubyte> {
 typedef struct {
 	ubyte  source_content_id[0x10];
 	ubyte  destination_content_id[0x10];
-	ubyte  source_size[0x6];
-	ubyte  destination_size[0x6];
+	uint32 source_size_low;
+	uint16 source_size_high;
+	uint32 destination_size_low;
+	uint16 destination_size_high;
 	uint16 fragment_count;
 	ContentType fragment_target_content_type;
 	UpdateType update_type;
@@ -204,16 +214,15 @@ typedef struct {
 
 typedef struct {
 	PatchMetaExtendedDataHeader patch_meta_extended_data_header;
-	PatchHistoryHeader patch_history_header[patch_meta_extended_data_header.history_count];
-	PatchDeltaHistory patch_delta_history[patch_meta_extended_data_header.delta_history_count];
-	PatchDeltaHeader patch_delta_header[patch_meta_extended_data_header.delta_count];
-	FragmentSet fragment_set[patch_meta_extended_data_header.fragment_set_count];
+	PatchHistoryHeader patch_history_headers[patch_meta_extended_data_header.history_count];
+	PatchDeltaHistory patch_delta_histories[patch_meta_extended_data_header.delta_history_count];
+	PatchDeltaHeader patch_delta_headers[patch_meta_extended_data_header.delta_count];
+	FragmentSet fragment_sets[patch_meta_extended_data_header.fragment_set_count];
 	ContentInfo history_content_info[patch_meta_extended_data_header.history_content_count];
 	PackagedContentInfo delta_packaged_content_info[patch_meta_extended_data_header.delta_content_count];
 	for (i = 0; i < patch_meta_extended_data_header.fragment_set_count; i++) {
-		fragment_indicator_count += fragment_set[i].fragment_count;
+		FragmentIndicator fragment_indicators[fragment_sets[i].fragment_count];
 	}
-	FragmentIndicator fragment_indicator[fragment_indicator_count];
 } PatchMetaExtendedData;
 
 typedef struct {
@@ -227,16 +236,15 @@ typedef struct {
 
 typedef struct {
 	DeltaMetaExtendedDataHeader delta_meta_extended_data_header;
-	FragmentSet fragment_set[delta_meta_extended_data_header.fragment_set_count];
+	FragmentSet fragment_sets[delta_meta_extended_data_header.fragment_set_count];
 	for (i = 0; i < patch_meta_extended_data_header.fragment_set_count; i++) {
-		fragment_indicator_count += fragment_set[i].fragment_count;
+		FragmentIndicator fragment_indicators[fragment_sets[i].fragment_count];
 	}
-	FragmentIndicator fragment_indicator[fragment_indicator_count];
 } DeltaMetaExtendedData;
 
 struct {
 	PackagedContentMetaHeader packaged_content_meta_header;
-	if (packaged_content_meta_header.extended_header_size > 0) {
+	if (packaged_content_meta_header.extended_header_size != 0) {
 		switch (packaged_content_meta_header.content_meta_type) {
 			case ContentMetaType_SystemUpdate:
 				SystemUpdateMetaExtendedHeader system_update_meta_extended_header;
@@ -260,7 +268,7 @@ struct {
 	}
 	PackagedContentInfo packaged_content_info[packaged_content_meta_header.content_count];
 	ContentMetaInfo content_meta_info[packaged_content_meta_header.content_meta_count];
-	if (extended_data_size > 0) {
+	if (extended_data_size != 0) {
 		switch (packaged_content_meta_header.content_meta_type) {
 			case ContentMetaType_SystemUpdate:
 				SystemUpdateMetaExtendedData system_update_meta_extended_data;
@@ -274,4 +282,4 @@ struct {
 		}
 	}
 	ubyte digest[0x20];
-} PackagedContentMeta;
+} packaged_content_meta;
