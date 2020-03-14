@@ -5,8 +5,9 @@ struct {
 	ubyte  signature[0x100];
 	ubyte  header_ctr[0x10];
 	ubyte  kernel_ctr[0x10];
-	ubyte  ini1_ctr[0x10];
-	ubyte  reserved_1[0x20]; /* Reserved CTRs */
+	ubyte  ini_ctr[0x10];
+	ubyte  unused_ctr[0x10];
+	ubyte  reserved_1[0x10];
 	char   magic[0x4];
 	if (magic != "PK21") {
 		Warning("File is not decrypted.");
@@ -18,12 +19,21 @@ struct {
 	ubyte  version_min;
 	uint16 reserved_3;
 	uint32 kernel_size;
-	uint32 ini1_size;
-	uint64 reserved_4; /* Reserved Sizes */
+	uint32 ini_size;
+	uint32 unused_size;
+	uint32 reserved_4;
 	uint32 kernel_offset;
-	uint32 ini1_offset;
-	uint64 reserved_5; /* Reserved Offsets */
+	uint32 ini_offset;
+	uint32 unused_offset;
+	uint32 reserved_5;
 	ubyte  kernel_hash[0x20];
-	ubyte  ini1_hash[0x20];
-	ubyte  reserved_6[0x40]; /* Reserved Hashes */
+	ubyte  ini_hash[0x20];
+	ubyte  unused_hash[0x20];
+	ubyte  reserved_6[0x20];
 } pk21_header;
+
+struct {
+	ubyte kernel[pk21_header.kernel_size];
+	ubyte ini[pk21_header.ini_size];
+	ubyte unused[pk21_header.unused_size];
+} pk21_body;
