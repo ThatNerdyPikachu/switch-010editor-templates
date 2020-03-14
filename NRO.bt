@@ -19,23 +19,35 @@ typedef struct {
 	uint32 size;
 } SegmentHeader;
 
+typedef struct {
+	uint32 offset;
+	uint32 size;
+} SectionHeader;
+
 struct {
 	char   magic[0x4];
 	uint32 version;
 	uint32 size;
 	uint32 flags;
-	SegmentHeader text;
-	SegmentHeader ro;
-	SegmentHeader data;
+	SegmentHeader text_segment_header;
+	SegmentHeader ro_segment_header;
+	SegmentHeader data_segment_header;
 	uint32 bss_size;
 	uint32 reserved_1;
 	ubyte  module_id[0x20];
 	uint32 dso_handle_offset;
 	uint32 reserved_2;
-	SegmentHeader embedded; /* api_info */
-	SegmentHeader dyn_str;
-	SegmentHeader dyn_sym;
+	SectionHeader embedded_section_header; /* api_info */
+	SectionHeader dyn_str_section_header;
+	SectionHeader dyn_sym_section_header;
 } nro_header;
+
+FSeek(0x0);
+struct {
+	ubyte text_segment[nro_header.text_segment_header.size];
+	ubyte ro_segment[nro_header.ro_segment_header.size];
+	ubyte data_segment[nro_header.data_segment_header.size];
+} nro_body;
 
 FSeek(mod_start.ro_crt.mod_offset);
 struct {
@@ -58,21 +70,17 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 	typedef struct {
 		uint64 offset;
 		uint64 size;
-	} AsetSegmentHeader;
+	} AsetSectionHeader;
 	
 	FSeek(nro_header.size);
 	struct {
 		char   magic[0x4];
 		uint32 version;
-		AsetSegmentHeader icon;
-		AsetSegmentHeader nacp;
-		AsetSegmentHeader romfs;
+		AsetSectionHeader icon_section_header;
+		AsetSectionHeader nacp_section_header;
+		AsetSectionHeader romfs_section_header;
 	} aset_header;
 	
-	FSeek(nro_header.size + aset_header.icon.offset);
-	ubyte icon[aset_header.icon.size];
-	
-	FSeek(nro_header.size + aset_header.nacp.offset);
 	typedef struct {
 		ubyte name[0x200];
 		ubyte publisher[0x100];
@@ -94,33 +102,31 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		AddOnContentRegistrationType_OnDemand    = 1
 	} AddOnContentRegistrationType;
 
-	typedef enum <uint32> {
-		AttributeFlag_None                     = 0,
-		AttributeFlag_Demo                     = 1,
-		AttributeFlag_RetailInteractiveDisplay = 2
+	typedef struct {
+		uint32 AttributeFlag_Demo                     : 1;
+		uint32 AttributeFlag_RetailInteractiveDisplay : 1;
 	} AttributeFlag;
 
 	typedef struct {
-		ubyte SupportedLanguageFlag_AmericanEnglish      : 1;
-		ubyte SupportedLanguageFlag_BritishEnglish       : 1;
-		ubyte SupportedLanguageFlag_Japanese             : 1;
-		ubyte SupportedLanguageFlag_French               : 1;
-		ubyte SupportedLanguageFlag_German               : 1;
-		ubyte SupportedLanguageFlag_LatinAmericanSpanish : 1;
-		ubyte SupportedLanguageFlag_Spanish              : 1;
-		ubyte SupportedLanguageFlag_Italian              : 1;
-		ubyte SupportedLanguageFlag_Dutch                : 1;
-		ubyte SupportedLanguageFlag_CanadianFrench       : 1;
-		ubyte SupportedLanguageFlag_Portuguese           : 1;
-		ubyte SupportedLanguageFlag_Russian              : 1;
-		ubyte SupportedLanguageFlag_Korean               : 1;
-		ubyte SupportedLanguageFlag_TraditionalChinese   : 1;
-		ubyte SupportedLanguageFlag_SimplifiedChinese    : 1;
-	} SupportedLanguageFlag <size=0x4>;
+		uint32 SupportedLanguageFlag_AmericanEnglish      : 1;
+		uint32 SupportedLanguageFlag_BritishEnglish       : 1;
+		uint32 SupportedLanguageFlag_Japanese             : 1;
+		uint32 SupportedLanguageFlag_French               : 1;
+		uint32 SupportedLanguageFlag_German               : 1;
+		uint32 SupportedLanguageFlag_LatinAmericanSpanish : 1;
+		uint32 SupportedLanguageFlag_Spanish              : 1;
+		uint32 SupportedLanguageFlag_Italian              : 1;
+		uint32 SupportedLanguageFlag_Dutch                : 1;
+		uint32 SupportedLanguageFlag_CanadianFrench       : 1;
+		uint32 SupportedLanguageFlag_Portuguese           : 1;
+		uint32 SupportedLanguageFlag_Russian              : 1;
+		uint32 SupportedLanguageFlag_Korean               : 1;
+		uint32 SupportedLanguageFlag_TraditionalChinese   : 1;
+		uint32 SupportedLanguageFlag_SimplifiedChinese    : 1;
+	} SupportedLanguageFlag;
 
-	typedef enum <uint32> {
-		ParentalControlFlag_None              = 0,
-		ParentalControlFlag_FreeCommunication = 1
+	typedef struct {
+		uint32 ParentalControlFlag_FreeCommunication : 1;
 	} ParentalControlFlag;
 
 	typedef enum <ubyte> {
@@ -164,7 +170,7 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 
 	typedef enum <ubyte> {
 		LogoType_LicensedByNintendo    = 0,
-		LogoType_DistributedByNintendo = 1,
+		LogoType_DistributedByNintendo = 1, /* Removed? */
 		LogoType_Nintendo              = 2
 	} LogoType;
 
@@ -194,9 +200,8 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		Hdcp_Required = 1
 	} Hdcp;
 
-	typedef enum <ubyte> {
-		StartupUserAccountOption_None       = 0,
-		StartupUserAccountOption_IsOptional = 1
+	typedef struct {
+		ubyte StartupUserAccountOption_IsOptional : 1;
 	} StartupUserAccountOption;
 
 	typedef enum <ubyte> {
@@ -205,9 +210,8 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		PlayLogQueryCapability_All       = 2
 	} PlayLogQueryCapability;
 
-	typedef enum <ubyte> {
-		RepairFlag_None                   = 0,
-		RepairFlag_SuppressGameCardAccess = 1
+	typedef struct {
+		ubyte RepairFlag_SuppressGameCardAccess : 1;
 	} RepairFlag;
 
 	typedef enum <ubyte> {
@@ -230,7 +234,7 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		uint64 memory_size;
 	} JitConfiguration;
 
-	struct {
+	typedef struct {
 		ApplicationTitle application_titles[0x10];
 		char   isbn[0x25];
 		StartupUserAccount startup_user_account;
@@ -286,78 +290,84 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		ApplicationNeighborDetectionGroupConfiguration receivable_group_configurations[0x10];
 		JitConfiguration jit_configuration;
 		ubyte  reserved_5[0xC40];
-	} nacp;
+	} Nacp;
 	
-	if (aset_header.romfs.size > 0) {
-		typedef struct {
-			uint64 header_size;
-			uint64 directory_hash_table_offset;
-			uint64 directory_hash_table_size;
-			uint64 directory_info_table_offset;
-			uint64 directory_info_table_size;
-			uint64 file_hash_table_offset;
-			uint64 file_hash_table_size;
-			uint64 file_info_table_offset;
-			uint64 file_info_table_size;
-			uint64 data_offset;
-		} RomFsHeader;
-		
-		typedef struct {
-			uint32 parent_directory_offset;
-			uint32 sibling_directory_offset;
-			uint32 child_directory_offset;
-			uint32 child_file_offset;
-			uint32 hash_offset;
-			uint32 name_length; /* 0x300 Limit */
-			char   name[name_length];
-			ubyte  reserved_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
-		} RomFsDirectoryInfo;
-		
-		typedef struct {
-			while (FTell() < header_offset + romfs_header.directory_info_table_offset + romfs_header.directory_info_table_size) {
-				RomFsDirectoryInfo romfs_directory_info;
-			}
-		} RomFsDirectoryInfoEntries;
-		
-		typedef struct {
-			uint32 parent_directory_offset;
-			uint32 sibling_file_offset;
-			uint64 data_offset;
-			uint64 data_size;
-			uint32 hash_offset;
-			uint32 name_length; /* 0x300 Limit */
-			char   name[name_length];
-			ubyte  reserved_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
-		} RomFsFileInfo;
-		
-		typedef struct {
-			while (FTell() < header_offset + romfs_header.file_info_table_offset + romfs_header.file_info_table_size) {
-				RomFsFileInfo romfs_file_info;
-				romfs_file_count++;
-			}
-		} RomFsFileInfoEntries;
-		
-		typedef struct {
-			ubyte file[romfs_file_info_entries.romfs_file_info[i].data_size];
-		} RomFsFileDataEntry;
-		
-		typedef struct {
-			for (i = 0; i < romfs_file_count; i++) {
-				RomFsFileDataEntry romfs_file_data_entry;
-			}
-		} RomFsFileDataEntries;
-		
-		struct {
-			RomFsHeader romfs_header;
-			header_offset = nro_header.size + aset_header.romfs.offset;
-			FSeek(header_offset + romfs_header.directory_hash_table_offset);
-			uint32 romfs_directory_hash_entries[romfs_header.directory_hash_table_size / 0x4];
-			RomFsDirectoryInfoEntries romfs_directory_info_entries;
-			FSeek(header_offset + romfs_header.file_hash_table_offset);
-			uint32 romfs_file_hash_entries[romfs_header.file_hash_table_size / 0x4];
-			RomFsFileInfoEntries romfs_file_info_entries;
-			FSeek(header_offset + romfs_header.data_offset);
-			RomFsFileDataEntries romfs_file_data_entries;
-		} romfs;
-	}
+	typedef struct {
+		uint64 header_size;
+		uint64 directory_hash_table_offset;
+		uint64 directory_hash_table_size;
+		uint64 directory_info_table_offset;
+		uint64 directory_info_table_size;
+		uint64 file_hash_table_offset;
+		uint64 file_hash_table_size;
+		uint64 file_info_table_offset;
+		uint64 file_info_table_size;
+		uint64 data_offset;
+	} RomFsHeader;
+	
+	typedef struct {
+		uint32 parent_directory_offset;
+		uint32 sibling_directory_offset;
+		uint32 child_directory_offset;
+		uint32 child_file_offset;
+		uint32 hash_offset;
+		uint32 name_length; /* 0x300 Limit */
+		char   name[name_length];
+		ubyte  reserved_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
+	} RomFsDirectoryInfo;
+	
+	typedef struct {
+		while (FTell() < header_offset + romfs_header.directory_info_table_offset + romfs_header.directory_info_table_size) {
+			RomFsDirectoryInfo romfs_directory_info;
+		}
+	} RomFsDirectoryInfoEntries;
+	
+	typedef struct {
+		uint32 parent_directory_offset;
+		uint32 sibling_file_offset;
+		uint64 data_offset;
+		uint64 data_size;
+		uint32 hash_offset;
+		uint32 name_length; /* 0x300 Limit */
+		char   name[name_length];
+		ubyte  reserved_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
+	} RomFsFileInfo;
+	
+	typedef struct {
+		while (FTell() < header_offset + romfs_header.file_info_table_offset + romfs_header.file_info_table_size) {
+			RomFsFileInfo romfs_file_info;
+			romfs_file_count++;
+		}
+	} RomFsFileInfoEntries;
+	
+	typedef struct {
+		ubyte file[romfs_file_info_entries.romfs_file_info[i].data_size];
+	} RomFsFileDataEntry;
+	
+	typedef struct {
+		for (i = 0; i < romfs_file_count; i++) {
+			RomFsFileDataEntry romfs_file_data_entry;
+		}
+	} RomFsFileDataEntries;
+	
+	typedef struct {
+		RomFsHeader romfs_header;
+		header_offset = nro_header.size + aset_header.romfs_section_header.offset;
+		FSeek(header_offset + romfs_header.directory_hash_table_offset);
+		uint32 romfs_directory_hash_entries[romfs_header.directory_hash_table_size / 0x4];
+		RomFsDirectoryInfoEntries romfs_directory_info_entries;
+		FSeek(header_offset + romfs_header.file_hash_table_offset);
+		uint32 romfs_file_hash_entries[romfs_header.file_hash_table_size / 0x4];
+		RomFsFileInfoEntries romfs_file_info_entries;
+		FSeek(header_offset + romfs_header.data_offset);
+		RomFsFileDataEntries romfs_file_data_entries;
+	} RomFs;
+	
+	struct {
+		ubyte icon[aset_header.icon_section_header.size];
+		Nacp  nacp;
+		if (aset_header.romfs_section_header.size != 0) {
+			RomFs romfs;
+		}
+	} aset_body;
 }
