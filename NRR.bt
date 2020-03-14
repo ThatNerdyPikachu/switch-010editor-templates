@@ -1,11 +1,6 @@
 LittleEndian();
 DisplayFormatHex();
 
-typedef enum <ubyte> {
-	NrrKind_User      = 0,
-	NrrKind_JitPlugin = 1
-} NrrKind;
-
 typedef struct {
 	uint64 application_id_mask;
 	uint64 application_id_pattern;
@@ -13,6 +8,11 @@ typedef struct {
 	ubyte  public_key[0x100];
 	ubyte  signature[0x100];
 } Certification;
+
+typedef enum <ubyte> {
+	NrrKind_User      = 0,
+	NrrKind_JitPlugin = 1
+} NrrKind;
 
 struct {
 	char   magic[0x4];
@@ -23,10 +23,10 @@ struct {
 	uint64 application_id;
 	uint32 size;
 	NrrKind nrr_kind;
-	ubyte  reserved_3[0x3];
+	ubyte  reserved_2[0x3];
 	uint32 hash_offset;
 	uint32 hash_count;
-	uint64 reserved_4;
+	uint64 reserved_3;
 } nrr_header;
 
 struct {
