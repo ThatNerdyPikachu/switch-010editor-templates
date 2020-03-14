@@ -22,33 +22,31 @@ typedef enum <ubyte> {
 	AddOnContentRegistrationType_OnDemand    = 1
 } AddOnContentRegistrationType;
 
-typedef enum <uint32> {
-	AttributeFlag_None                     = 0,
-	AttributeFlag_Demo                     = 1,
-	AttributeFlag_RetailInteractiveDisplay = 2
+typedef struct {
+	uint32 AttributeFlag_Demo                     : 1;
+	uint32 AttributeFlag_RetailInteractiveDisplay : 1;
 } AttributeFlag;
 
 typedef struct {
-	ubyte SupportedLanguageFlag_AmericanEnglish      : 1;
-	ubyte SupportedLanguageFlag_BritishEnglish       : 1;
-	ubyte SupportedLanguageFlag_Japanese             : 1;
-	ubyte SupportedLanguageFlag_French               : 1;
-	ubyte SupportedLanguageFlag_German               : 1;
-	ubyte SupportedLanguageFlag_LatinAmericanSpanish : 1;
-	ubyte SupportedLanguageFlag_Spanish              : 1;
-	ubyte SupportedLanguageFlag_Italian              : 1;
-	ubyte SupportedLanguageFlag_Dutch                : 1;
-	ubyte SupportedLanguageFlag_CanadianFrench       : 1;
-	ubyte SupportedLanguageFlag_Portuguese           : 1;
-	ubyte SupportedLanguageFlag_Russian              : 1;
-	ubyte SupportedLanguageFlag_Korean               : 1;
-	ubyte SupportedLanguageFlag_TraditionalChinese   : 1;
-	ubyte SupportedLanguageFlag_SimplifiedChinese    : 1;
-} SupportedLanguageFlag <size=0x4>;
+	uint32 SupportedLanguageFlag_AmericanEnglish      : 1;
+	uint32 SupportedLanguageFlag_BritishEnglish       : 1;
+	uint32 SupportedLanguageFlag_Japanese             : 1;
+	uint32 SupportedLanguageFlag_French               : 1;
+	uint32 SupportedLanguageFlag_German               : 1;
+	uint32 SupportedLanguageFlag_LatinAmericanSpanish : 1;
+	uint32 SupportedLanguageFlag_Spanish              : 1;
+	uint32 SupportedLanguageFlag_Italian              : 1;
+	uint32 SupportedLanguageFlag_Dutch                : 1;
+	uint32 SupportedLanguageFlag_CanadianFrench       : 1;
+	uint32 SupportedLanguageFlag_Portuguese           : 1;
+	uint32 SupportedLanguageFlag_Russian              : 1;
+	uint32 SupportedLanguageFlag_Korean               : 1;
+	uint32 SupportedLanguageFlag_TraditionalChinese   : 1;
+	uint32 SupportedLanguageFlag_SimplifiedChinese    : 1;
+} SupportedLanguageFlag;
 
-typedef enum <uint32> {
-	ParentalControlFlag_None              = 0,
-	ParentalControlFlag_FreeCommunication = 1
+typedef struct {
+	uint32 ParentalControlFlag_FreeCommunication : 1;
 } ParentalControlFlag;
 
 typedef enum <ubyte> {
@@ -92,7 +90,7 @@ typedef struct {
 
 typedef enum <ubyte> {
 	LogoType_LicensedByNintendo    = 0,
-	LogoType_DistributedByNintendo = 1,
+	LogoType_DistributedByNintendo = 1, /* Removed? */
 	LogoType_Nintendo              = 2
 } LogoType;
 
@@ -122,9 +120,8 @@ typedef enum <ubyte> {
 	Hdcp_Required = 1
 } Hdcp;
 
-typedef enum <ubyte> {
-	StartupUserAccountOption_None       = 0,
-	StartupUserAccountOption_IsOptional = 1
+typedef struct {
+	ubyte StartupUserAccountOption_IsOptional : 1;
 } StartupUserAccountOption;
 
 typedef enum <ubyte> {
@@ -133,9 +130,8 @@ typedef enum <ubyte> {
 	PlayLogQueryCapability_All       = 2
 } PlayLogQueryCapability;
 
-typedef enum <ubyte> {
-	RepairFlag_None                   = 0,
-	RepairFlag_SuppressGameCardAccess = 1
+typedef struct {
+	ubyte RepairFlag_SuppressGameCardAccess : 1;
 } RepairFlag;
 
 typedef enum <ubyte> {
