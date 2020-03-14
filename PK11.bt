@@ -1,6 +1,8 @@
 LittleEndian();
 DisplayFormatHex();
 
+local ubyte old_layout;
+
 struct {
 	uint32 package1_loader_hash;
 	uint32 secure_monitor_hash;
@@ -10,7 +12,11 @@ struct {
 	uint16 version;
 } package1_loader_header;
 
-FSeek(0x3FE0); /* Offset is different for newer package1 */
+if (package1_loader_header.build_timestamp[0] == '2' && package1_loader_header.build_timestamp[1] == '0' && package1_loader_header.build_timestamp[2] == '1' && package1_loader_header.build_timestamp[3] == '6') {
+	old_layout = 1;
+}
+
+FSeek(0x3FE0); /* Offset is different for newer package1 - 0x6FE0 */
 struct {
 	uint32 size;
 	ubyte  reserved_1[0xC];
@@ -20,24 +26,35 @@ struct {
 typedef struct {
 	uint32 size;
 	uint32 offset;
-} SegmentHeader;
+} SectionHeader;
 
 struct {
-	char   magic[0x4];
+	char magic[0x4];
 	if (magic != "PK11") {
 		Warning("File is not decrypted.");
 		Exit(-1);
 	}
-	if (package1_loader_header.version <= 0x600) {
-		SegmentHeader secure_monitor;
+	if (old_layout) {
+		SectionHeader secure_monitor_section_header;
+		uint32 reserved_1;
+		SectionHeader nx_bootloader_section_header;
+		SectionHeader warmboot_section_header;
 	} else {
-		SegmentHeader warmboot;
-	}
-	uint32 reserved_1;
-	section_header_t nx_bootloader;
-	if (package1_loader_header.version <= 0x600) {
-		SegmentHeader warmboot;
-	} else {
-		SegmentHeader secure_monitor;
+		SectionHeader warmboot_section_header;
+		uint32 reserved_1;
+		SectionHeader nx_bootloader_section_header;
+		SectionHeader secure_monitor_section_header;
 	}
 } pk11_header;
+
+struct {
+	if (old_layout) {
+		ubyte secure_montior[pk11_header.secure_monitor_section_header.size];
+		ubyte nx_bootloader[pk11_header.nx_bootloader_section_header.size];
+		ubyte warmboot[pk11_header.warmboot_section_header.size];
+	} else {
+		ubyte warmboot[pk11_header.warmboot_section_header.size];
+		ubyte nx_bootloader[pk11_header.nx_bootloader_section_header.size];
+		ubyte secure_montior[pk11_header.secure_monitor_section_header.size];
+	}
+} pk11_body;
