@@ -4,7 +4,7 @@ DisplayFormatHex();
 typedef struct {
 	ubyte name[0x200];
 	ubyte publisher[0x100];
-} ApplicationTitle;
+} Title;
 
 typedef enum <ubyte> {
 	StartupUserAccount_None                                       = 0,
@@ -134,10 +134,19 @@ typedef struct {
 	ubyte RepairFlag_SuppressGameCardAccess : 1;
 } RepairFlag;
 
-typedef enum <ubyte> {
-	RequiredNetworkServiceLicenseOnLaunch_None   = 0,
-	RequiredNetworkServiceLicenseOnLaunch_Common = 1
-} RequiredNetworkServiceLicenseOnLaunch;
+typedef struct {
+	ubyte RequiredNetworkServiceLicenseOnLaunchFlag_Common : 1;
+} RequiredNetworkServiceLicenseOnLaunchFlag;
+
+typedef struct {
+	uint64 group_id;
+	ubyte  key[0x10];
+} NeighborDetectionGroupConfiguration;
+
+typedef struct {
+	NeighborDetectionGroupConfiguration send_group_configuration;
+	NeighborDetectionGroupConfiguration receivable_group_configurations[0x10];
+} NeighborDetectionClientConfiguration;
 
 typedef enum <uint64> {
 	JitConfigurationFlag_None    = 0,
@@ -145,17 +154,12 @@ typedef enum <uint64> {
 } JitConfigurationFlag;
 
 typedef struct {
-	uint64 group_id;
-	ubyte  key[0x10];
-} ApplicationNeighborDetectionGroupConfiguration;
-
-typedef struct {
 	JitConfigurationFlag jit_configuration_flag;
 	uint64 memory_size;
 } JitConfiguration;
 
 struct {
-	ApplicationTitle application_titles[0x10];
+	Title  titles[0x10];
 	char   isbn[0x25];
 	StartupUserAccount startup_user_account;
 	UserAccountSwitchLock user_account_switch_lock; /* Old: touch_screen_usage (None, Supported, Required) */
@@ -204,10 +208,9 @@ struct {
 	PlayLogQueryCapability play_log_query_capability;
 	RepairFlag repair_flag;
 	ubyte  program_index;
-	RequiredNetworkServiceLicenseOnLaunch required_network_service_license_on_launch;
+	RequiredNetworkServiceLicenseOnLaunchFlag required_network_service_license_on_launch_flag;
 	uint32 reserved_4;
-	ApplicationNeighborDetectionGroupConfiguration send_group_configuration;
-	ApplicationNeighborDetectionGroupConfiguration receivable_group_configurations[0x10];
+	NeighborDetectionClientConfiguration neighbor_detection_client_configuration;
 	JitConfiguration jit_configuration;
 	ubyte  reserved_5[0xC40];
 } nacp;
