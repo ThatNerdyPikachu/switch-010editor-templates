@@ -1,6 +1,8 @@
 BigEndian();
 DisplayFormatHex();
 
+local uint32 offset;
+
 typedef enum <uint32> {
 	SigType_Rsa4096Sha1    = 65536,
 	SigType_Rsa2048Sha1    = 65537,
@@ -11,12 +13,12 @@ typedef enum <uint32> {
 } SigType;
 
 typedef enum <uint32> {
-	KeyType_Rsa4096   = 0,
-	KeyType_Rsa2048   = 1,
-	KeyType_Ecsda240  = 2
-} KeyType;
+	PubKeyType_Rsa4096   = 0,
+	PubKeyType_Rsa2048   = 1,
+	PubKeyType_Ecsda240  = 2
+} PubKeyType;
 
-struct {
+typedef struct {
 	SigType sig_type;
 	switch (sig_type) {
 		case SigType_Rsa4096Sha1:
@@ -36,23 +38,28 @@ struct {
 			break;
 	}
 	char    issuer[0x40];
-	KeyType key_type;
+	PubKeyType pub_key_type;
 	char    subject[0x40];
 	uint32  cert_id;
-	switch (key_type) {
-		case KeyType_Rsa4096:
+	switch (pub_key_type) {
+		case PubKeyType_Rsa4096:
 			ubyte  public_key[0x200];
 			uint32 public_exponent;
 			ubyte  reserved_2[0x34];
 			break;
-		case KeyType_Rsa2048:
+		case PubKeyType_Rsa2048:
 			ubyte  public_key[0x100];
 			uint32 public_exponent;
 			ubyte  reserved_2[0x34];
 			break;
-		case KeyType_Ecsda240:
+		case PubKeyType_Ecsda240:
 			ubyte  public_key[0x3C];
 			ubyte  reserved_2[0x3C];
 			break;
 	}
-} certificate;
+} Certificate;
+
+while (offset < FileSize()) {
+	Certificate certificate;
+	offset = FTell();
+}
