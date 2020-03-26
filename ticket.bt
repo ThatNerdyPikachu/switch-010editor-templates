@@ -1,0 +1,106 @@
+LittleEndian();
+DisplayFormatHex();
+
+local uint32 i, j;
+
+typedef enum <uint32> {
+	SigType_Rsa4096Sha1    = 65536,
+	SigType_Rsa2048Sha1    = 65537,
+	SigType_Ecsda240Sha1   = 65538,
+	SigType_Rsa4096Sha256  = 65539,
+	SigType_Rsa2048Sha256  = 65540,
+	SigType_Ecsda240Sha256 = 65541
+} SigType;
+
+typedef enum <ubyte> {
+	TitleKeyType_Common       = 0,
+	TitleKeyType_Personalized = 1
+} TitleKeyType;
+
+typedef enum <ubyte> {
+	LicenseType_Permanent    = 0,
+	LicenseType_Demo         = 1,
+	LicenseType_Trial        = 2,
+	LicenseType_Rental       = 3,
+	LicenseType_Subscription = 4,
+	LicenseType_Service      = 5
+} LicenseType;
+
+typedef struct {
+	ubyte PropertyMask_PreInstallationFlag   : 1;
+	ubyte PropertyMask_SharedTitleFlag       : 1;
+	ubyte PropertyMask_AllContentsFlag       : 1;
+	ubyte PropertyMask_DeviceLinkIndependent : 1;
+	ubyte PropertyMask_VolatileFlag          : 1;
+	ubyte PropertyMask_ELicenseRequiredFlag  : 1;
+} PropertyMask;
+
+typedef enum <uint16> {
+	SectionType_Permanent          = 1,
+	SectionType_Subscription       = 2,
+	SectionType_Content            = 3,
+	SectionType_ContentConsumption = 4,
+	SectionType_AccessTitle        = 5,
+	SectionType_LimitedResource    = 6
+} SectionType;
+
+typedef struct {
+	ubyte record[parentof(this).record_size];
+} Esv1SectionTypeRecord;
+
+typedef struct {
+	uint32 sect_offset;
+	uint32 record_size;
+	uint32 section_size;
+	uint16 records; /* record_count */
+	SectionType section_type;
+	for (j = 0; j < records; j++) {
+		Esv1SectionTypeRecord esv1_section_type_record; /* Placeholder */
+	}
+} Esv2SectionRecord;
+
+struct {
+	SigType sig_type;
+	switch (sig_type) {
+		case SigType_Rsa4096Sha1:
+		case SigType_Rsa4096Sha256:
+			ubyte signature[0x200];
+			ubyte reserved_1[0x3C];
+			break;
+		case SigType_Rsa2048Sha1:
+		case SigType_Rsa2048Sha256:
+			ubyte signature[0x100];
+			ubyte reserved_1[0x3C];
+			break;
+		case SigType_Ecsda240Sha1:
+		case SigType_Ecsda240Sha256:
+			ubyte signature[0x3C];
+			ubyte reserved_1[0x40];
+			break;
+	}
+	char   issuer[0x40];
+	if (ReadUByte(FTell() + 0x101) == 0) { /* TitleKeyType_Common */
+		ubyte title_key[0x10];
+		ubyte title_key_reserved[0xF0];
+	} else if (ReadUByte(FTell() + 0x101) == 1) { /* TitleKeyType_Personalized */
+		ubyte title_key[0x100];
+	}
+	ubyte  format_version;
+	TitleKeyType title_key_type;
+	uint16 ticket_version;
+	LicenseType license_type;
+	ubyte  common_key_id; /* key_generation */
+	PropertyMask property_mask;
+	ubyte  reserved_3[0x9];
+	uint64 ticket_id;
+	uint64 device_id;
+	ubyte  rights_id[0x10];
+	uint32 account_id;
+	uint32 sect_total_size;
+	uint32 sect_hdr_offset;
+	uint16 sect_hdrs; /* sect_hdr_count */
+	uint16 sect_hdr_entry_size;
+	for (i = 0; i < sect_hdrs; i++) {
+		Esv2SectionRecord esv2_section_records;
+	}
+} ticket;
