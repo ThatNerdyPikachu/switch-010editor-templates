@@ -16,7 +16,7 @@ typedef enum <ubyte> {
 
 struct {
 	char   magic[0x4];
-	ubyte  cert_signature_key_generation;
+	ubyte  signature_key_generation; /* certification.signature */
 	ubyte  reserved_1[0xB];
 	Certification certification;
 	ubyte  signature[0x100];
