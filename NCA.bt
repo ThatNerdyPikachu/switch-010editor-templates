@@ -1,7 +1,7 @@
 LittleEndian();
 DisplayFormatHex();
 
-local uint32 i, j, file_entry_count;
+local uint32 i, j, rom_file_entry_count;
 local uint64 fs_offset;
 
 typedef enum <ubyte> {
@@ -300,16 +300,18 @@ for (i = 0; i < 4; i++) {
 			}
 			FSeek(fs_offset + rom_file_system_information.directory_bucket_offset);
 			uint32 rom_directory_buckets[rom_file_system_information.directory_bucket_size / 0x4];
+			FSeek(fs_offset + rom_file_system_information.directory_entry_offset);
 			while (FTell() < (fs_offset + rom_file_system_information.directory_entry_offset + rom_file_system_information.directory_entry_size)) {
 				RomDirectoryEntry rom_directory_entry;
 			}
 			FSeek(fs_offset + rom_file_system_information.file_bucket_offset);
 			uint32 rom_file_buckets[rom_file_system_information.file_bucket_size / 0x4];
+			FSeek(fs_offset + rom_file_system_information.file_entry_offset);
 			while (FTell() < (fs_offset + rom_file_system_information.file_entry_offset + rom_file_system_information.file_entry_size)) {
 				RomFileEntry rom_file_entry;
-				file_entry_count++;
+				rom_file_entry_count++;
 			}
-			for (j = 0; j < file_entry_count; j++) {
+			for (j = 0; j < rom_file_entry_count; j++) {
 				FSeek(fs_offset + rom_file_system_information.body_offset + rom_file_entry[j].offset);
 				RomFileData rom_file_data;
 			}
