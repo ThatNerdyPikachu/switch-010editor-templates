@@ -24,7 +24,7 @@ typedef struct {
 
 struct {
 	char   magic[0x4];
-	ubyte  acid_signature_key_generation;
+	ubyte  signature_key_generation; /* acid_header.signature */
 	ubyte  reserved_1[0x7];
 	MetaFlags flags;
 	ubyte  reserved_2;
@@ -51,8 +51,7 @@ typedef enum <uint32> {
 typedef struct {
 	uint32 AcidFlags_Production          : 1;
 	uint32 AcidFlags_UnqualifiedApproval : 1;
-	//uint32 AcidFlags_UseSecureMemory   : 1; /* Deprecated */
-	MemoryRegion AcidFlags_MemoryRegion  : 2; /* [5.0.0+] */
+	MemoryRegion AcidFlags_MemoryRegion  : 2;
 } AcidFlags;
 
 typedef struct {
