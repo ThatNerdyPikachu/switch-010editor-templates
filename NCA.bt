@@ -142,7 +142,7 @@ typedef struct {
 
 struct {
 	ubyte  main_signature[0x100];
-	ubyte  npdm_signature[0x100];
+	ubyte  acid_signature[0x100];
 	char   magic[0x4];
 	if (magic != "NCA0" && magic != "NCA2" && magic != "NCA3") {
 		Warning("File is not decrypted or is not a valid NCA file.");
@@ -196,7 +196,7 @@ typedef struct {
 	uint32 parent_offset;
 	uint32 next_offset;
 	uint32 directory_offset;
-	uint32 child_offset;
+	uint32 file_offset;
 	uint32 hash_offset;
 	uint32 name_length;
 	char   name[name_length];
