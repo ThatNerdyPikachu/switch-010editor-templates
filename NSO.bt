@@ -45,6 +45,39 @@ struct {
 	ubyte  data_hash[0x20];
 } nso_header;
 
+typedef struct {
+	ubyte name_length;
+	char  name[name_length];
+} ModuleName;
+
+typedef struct {
+	uint32 entry_point;
+	uint32 mod_offset;
+} RoCrt;
+
+typedef struct {
+	RoCrt ro_crt;
+	if (ReadString(FTell(), 0x8) == "HOMEBREW") {
+		char reserved_1[0x8];
+	}
+} ModStart;
+
+typedef struct {
+	char   magic[0x4];
+	uint32 dynamic_offset;
+	uint32 bss_start_offset;
+	uint32 bss_end_offset;
+	uint32 eh_frame_hdr_start_offset;
+	uint32 eh_frame_hdr_end_offset;
+	uint32 module_object_offset;
+} ModHeader;
+
+typedef struct {
+	char   magic[0x4];
+	uint32 got_start_offset;
+	uint32 got_end_offset;
+} LnyHeader;
+
 struct {
 	FSeek(nso_header.text_segment_header.file_offset);
 	ubyte text_segment[nso_header.text_file_size];
@@ -52,45 +85,23 @@ struct {
 	ubyte ro_segment[nso_header.ro_file_size];
 	FSeek(nso_header.data_segment_header.file_offset);
 	ubyte data_segment[nso_header.data_file_size];
-} nso_body;
-
-if (!nso_header.flags.Flags_TextCompress) {
-	FSeek(nso_header.text_segment_header.file_offset);
-	if (nso_header.module_name_offset == 0x100 && nso_header.module_name_size != 0) {
-		struct {
-			ubyte name_size;
-			char  name[name_size];
-		} module_name;
+	if (nso_header.module_name_size != 0) {
+		FSeek(nso_header.module_name_offset);
+		ModuleName module_name;
 	}
-	
-	typedef struct {
-		uint32 entry_point_insn;
-		uint32 mod_offset;
-	} RoCrt;
-	
-	struct {
-		RoCrt ro_crt;
-		if (ReadString(FTell(), 0x8) == "HOMEBREW") {
-			char reserved_1[0x8];
+	if (!nso_header.flags.Flags_TextCompress) {
+		FSeek(nso_header.text_segment_header.file_offset);
+		ModStart mod_start;
+		FSeek(nso_header.text_segment_header.file_offset + mod_start.ro_crt.mod_offset);
+		ModHeader mod_header;
+		if (exists(mod_start.reserved_1)) {
+			LnyHeader lny_header;
 		}
-	} mod_start;
-	
-	FSeek(nso_header.text_segment_header.file_offset + mod_start.ro_crt.mod_offset);
-	struct {
-		char   magic[0x4];
-		uint32 dynamic_offset;
-		uint32 bss_start_offset;
-		uint32 bss_end_offset;
-		uint32 eh_frame_hdr_start_offset;
-		uint32 eh_frame_hdr_end_offset;
-		uint32 module_object_offset;
-	} mod_header;
-	
-	if (exists(mod_start.reserved_1)) {
-		struct {
-			char   magic[0x4];
-			uint32 got_start_offset;
-			uint32 got_end_offset;
-		} lny_header;
+		FSeek(nso_header.ro_segment_header.file_offset + nso_header.embedded_section_header.offset);
+		ubyte embedded_section[nso_header.embedded_section_header.size];
+		FSeek(nso_header.ro_segment_header.file_offset + nso_header.dyn_str_section_header.offset);
+		ubyte dyn_str_section[nso_header.dyn_str_section_header.size];
+		FSeek(nso_header.ro_segment_header.file_offset + nso_header.dyn_sym_section_header.offset);
+		ubyte dyn_sym_section[nso_header.dyn_sym_section_header.size];
 	}
-}
+} nso_body;
