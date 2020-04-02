@@ -1,17 +1,17 @@
 LittleEndian();
 DisplayFormatHex();
 
-local uint32 i, romfs_file_count;
-local uint64 header_offset;
+local uint32 i, rom_file_entry_count;
+local uint64 fs_offset;
 
 typedef struct {
-	uint32 entry_point_insn;
+	uint32 entry_point;
 	uint32 mod_offset;
 } RoCrt;
 
 struct {
 	RoCrt ro_crt;
-	char  reserved_1[0x8]; /* "HOMEBREW */
+	char  reserved_1[0x8];
 } mod_start;
 
 typedef struct {
@@ -42,15 +42,7 @@ struct {
 	SectionHeader dyn_sym_section_header;
 } nro_header;
 
-FSeek(0x0);
-struct {
-	ubyte text_segment[nro_header.text_segment_header.size];
-	ubyte ro_segment[nro_header.ro_segment_header.size];
-	ubyte data_segment[nro_header.data_segment_header.size];
-} nro_body;
-
-FSeek(mod_start.ro_crt.mod_offset);
-struct {
+typedef struct {
 	char   magic[0x4];
 	uint32 dynamic_offset;
 	uint32 bss_start_offset;
@@ -58,15 +50,33 @@ struct {
 	uint32 eh_frame_hdr_start_offset;
 	uint32 eh_frame_hdr_end_offset;
 	uint32 module_object_offset;
-} mod_header;
+} ModHeader;
+
+typedef struct {
+	char   magic[0x4];
+	uint32 got_start_offset;
+	uint32 got_end_offset;
+} LnyHeader;
+
+FSeek(0x0);
+struct {
+	ubyte text_segment[nro_header.text_segment_header.size];
+	ubyte ro_segment[nro_header.ro_segment_header.size];
+	ubyte data_segment[nro_header.data_segment_header.size];
+	FSeek(mod_start.ro_crt.mod_offset);
+	ModHeader mod_header;
+	if (mod_start.reserved_1 == "HOMEBREW") {
+		LnyHeader lny_header;
+	}
+	FSeek(startof(ro_segment) + nro_header.embedded_section_header.offset);
+	ubyte embedded_section[nro_header.embedded_section_header.size];
+	FSeek(startof(ro_segment) + nro_header.dyn_str_section_header.offset);
+	ubyte dyn_str_section[nro_header.dyn_str_section_header.size];
+	FSeek(startof(ro_segment) + nro_header.dyn_sym_section_header.offset);
+	ubyte dyn_sym_section[nro_header.dyn_sym_section_header.size];
+} nro_body;
 
 if (mod_start.reserved_1 == "HOMEBREW") {
-	struct {
-		char   magic[0x4];
-		uint32 got_start_offset;
-		uint32 got_end_offset;
-	} lny_header;
-	
 	typedef struct {
 		uint64 offset;
 		uint64 size;
@@ -80,11 +90,11 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		AsetSectionHeader nacp_section_header;
 		AsetSectionHeader romfs_section_header;
 	} aset_header;
-	
+
 	typedef struct {
 		ubyte name[0x200];
 		ubyte publisher[0x100];
-	} ApplicationTitle;
+	} Title;
 
 	typedef enum <ubyte> {
 		StartupUserAccount_None                                       = 0,
@@ -214,10 +224,19 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		ubyte RepairFlag_SuppressGameCardAccess : 1;
 	} RepairFlag;
 
-	typedef enum <ubyte> {
-		RequiredNetworkServiceLicenseOnLaunch_None   = 0,
-		RequiredNetworkServiceLicenseOnLaunch_Common = 1
-	} RequiredNetworkServiceLicenseOnLaunch;
+	typedef struct {
+		ubyte RequiredNetworkServiceLicenseOnLaunchFlag_Common : 1;
+	} RequiredNetworkServiceLicenseOnLaunchFlag;
+
+	typedef struct {
+		uint64 group_id;
+		ubyte  key[0x10];
+	} NeighborDetectionGroupConfiguration;
+
+	typedef struct {
+		NeighborDetectionGroupConfiguration send_group_configuration;
+		NeighborDetectionGroupConfiguration receivable_group_configurations[0x10];
+	} NeighborDetectionClientConfiguration;
 
 	typedef enum <uint64> {
 		JitConfigurationFlag_None    = 0,
@@ -225,17 +244,12 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 	} JitConfigurationFlag;
 
 	typedef struct {
-		uint64 group_id;
-		ubyte  key[0x10];
-	} ApplicationNeighborDetectionGroupConfiguration;
-
-	typedef struct {
 		JitConfigurationFlag jit_configuration_flag;
 		uint64 memory_size;
 	} JitConfiguration;
 
 	typedef struct {
-		ApplicationTitle application_titles[0x10];
+		Title  titles[0x10];
 		char   isbn[0x25];
 		StartupUserAccount startup_user_account;
 		UserAccountSwitchLock user_account_switch_lock; /* Old: touch_screen_usage (None, Supported, Required) */
@@ -284,90 +298,79 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		PlayLogQueryCapability play_log_query_capability;
 		RepairFlag repair_flag;
 		ubyte  program_index;
-		RequiredNetworkServiceLicenseOnLaunch required_network_service_license_on_launch;
+		RequiredNetworkServiceLicenseOnLaunchFlag required_network_service_license_on_launch_flag;
 		uint32 reserved_4;
-		ApplicationNeighborDetectionGroupConfiguration send_group_configuration;
-		ApplicationNeighborDetectionGroupConfiguration receivable_group_configurations[0x10];
+		NeighborDetectionClientConfiguration neighbor_detection_client_configuration;
 		JitConfiguration jit_configuration;
 		ubyte  reserved_5[0xC40];
 	} Nacp;
 	
 	typedef struct {
 		uint64 header_size;
-		uint64 directory_hash_table_offset;
-		uint64 directory_hash_table_size;
-		uint64 directory_info_table_offset;
-		uint64 directory_info_table_size;
-		uint64 file_hash_table_offset;
-		uint64 file_hash_table_size;
-		uint64 file_info_table_offset;
-		uint64 file_info_table_size;
-		uint64 data_offset;
-	} RomFsHeader;
+		uint64 directory_bucket_offset;
+		uint64 directory_bucket_size;
+		uint64 directory_entry_offset;
+		uint64 directory_entry_size;
+		uint64 file_bucket_offset;
+		uint64 file_bucket_size;
+		uint64 file_entry_offset;
+		uint64 file_entry_size;
+		uint64 body_offset;
+	} RomFileSystemInformation;
 	
 	typedef struct {
-		uint32 parent_directory_offset;
-		uint32 sibling_directory_offset;
-		uint32 child_directory_offset;
-		uint32 child_file_offset;
+		uint32 parent_offset;
+		uint32 next_offset;
+		uint32 directory_offset;
+		uint32 file_offset;
 		uint32 hash_offset;
-		uint32 name_length; /* 0x300 Limit */
+		uint32 name_length;
 		char   name[name_length];
 		ubyte  reserved_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
-	} RomFsDirectoryInfo;
+	} RomDirectoryEntry;
 	
 	typedef struct {
-		while (FTell() < header_offset + romfs_header.directory_info_table_offset + romfs_header.directory_info_table_size) {
-			RomFsDirectoryInfo romfs_directory_info;
-		}
-	} RomFsDirectoryInfoEntries;
-	
-	typedef struct {
-		uint32 parent_directory_offset;
-		uint32 sibling_file_offset;
-		uint64 data_offset;
-		uint64 data_size;
+		uint32 parent_offset;
+		uint32 next_offset;
+		uint64 offset;
+		uint64 size;
 		uint32 hash_offset;
-		uint32 name_length; /* 0x300 Limit */
+		uint32 name_length;
 		char   name[name_length];
 		ubyte  reserved_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
-	} RomFsFileInfo;
+	} RomFileEntry;
 	
 	typedef struct {
-		while (FTell() < header_offset + romfs_header.file_info_table_offset + romfs_header.file_info_table_size) {
-			RomFsFileInfo romfs_file_info;
-			romfs_file_count++;
+		ubyte data[rom_file_entry[i].size];
+	} RomFileData;
+	
+	typedef struct {
+		fs_offset = nro_header.size + aset_header.romfs_section_header.offset;
+		RomFileSystemInformation rom_file_system_information;
+		FSeek(fs_offset + rom_file_system_information.directory_bucket_offset);
+		uint32 rom_directory_buckets[rom_file_system_information.directory_bucket_size / 0x4];
+		FSeek(fs_offset + rom_file_system_information.directory_entry_offset);
+		while (FTell() < (fs_offset + rom_file_system_information.directory_entry_offset + rom_file_system_information.directory_entry_size)) {
+			RomDirectoryEntry rom_directory_entry;
 		}
-	} RomFsFileInfoEntries;
-	
-	typedef struct {
-		ubyte file[romfs_file_info_entries.romfs_file_info[i].data_size];
-	} RomFsFileDataEntry;
-	
-	typedef struct {
-		for (i = 0; i < romfs_file_count; i++) {
-			RomFsFileDataEntry romfs_file_data_entry;
+		FSeek(fs_offset + rom_file_system_information.file_bucket_offset);
+		uint32 rom_file_buckets[rom_file_system_information.file_bucket_size / 0x4];
+		FSeek(fs_offset + rom_file_system_information.file_entry_offset);
+		while (FTell() < (fs_offset + rom_file_system_information.file_entry_offset + rom_file_system_information.file_entry_size)) {
+			RomFileEntry rom_file_entry;
+			rom_file_entry_count++;
 		}
-	} RomFsFileDataEntries;
-	
-	typedef struct {
-		RomFsHeader romfs_header;
-		header_offset = nro_header.size + aset_header.romfs_section_header.offset;
-		FSeek(header_offset + romfs_header.directory_hash_table_offset);
-		uint32 romfs_directory_hash_entries[romfs_header.directory_hash_table_size / 0x4];
-		RomFsDirectoryInfoEntries romfs_directory_info_entries;
-		FSeek(header_offset + romfs_header.file_hash_table_offset);
-		uint32 romfs_file_hash_entries[romfs_header.file_hash_table_size / 0x4];
-		RomFsFileInfoEntries romfs_file_info_entries;
-		FSeek(header_offset + romfs_header.data_offset);
-		RomFsFileDataEntries romfs_file_data_entries;
-	} RomFs;
+		for (i = 0; i < rom_file_entry_count; i++) {
+			FSeek(fs_offset + rom_file_system_information.body_offset + rom_file_entry[i].offset);
+			RomFileData rom_file_data;
+		}
+	} RomFileSystem;
 	
 	struct {
 		ubyte icon[aset_header.icon_section_header.size];
 		Nacp  nacp;
 		if (aset_header.romfs_section_header.size != 0) {
-			RomFs romfs;
+			RomFileSystem rom_file_system;
 		}
 	} aset_body;
 }
