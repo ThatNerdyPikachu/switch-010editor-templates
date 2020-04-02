@@ -9,13 +9,18 @@ typedef enum <ubyte> {
 	ProcessAddressSpace_AddressSpace64Bit = 1
 } ProcessAddressSpace;
 
+typedef enum <ubyte> {
+	MemoryRegion_NonSecureSystem = 0,
+	MemoryRegion_SecureSystem    = 1
+} MemoryRegion;
+
 typedef struct {
 	ubyte Flags_TextCompress       : 1;
 	ubyte Flags_RoCompress         : 1;
 	ubyte Flags_DataCompress       : 1;
 	ubyte Flags_Is64BitInstruction : 1;
 	ProcessAddressSpace Flags_ProcessAddressSpace : 1;
-	ubyte Flags_UseSecureMemory    : 1;
+	MemoryRegion Flags_MemoryRegion : 1;
 } Flags;
 
 typedef struct {
@@ -343,6 +348,34 @@ typedef struct {
 	uint32 additional_size;
 } SegmentFooter;
 
+typedef struct {
+	uint32 entry_point;
+	uint32 mod_offset;
+} RoCrt;
+
+typedef struct {
+	RoCrt ro_crt;
+	if (ReadString(FTell(), 0x8) == "HOMEBREW") {
+		char reserved_1[0x8];
+	}
+} ModStart;
+
+typedef struct {
+	char   magic[0x4];
+	uint32 dynamic_offset;
+	uint32 bss_start_offset;
+	uint32 bss_end_offset;
+	uint32 eh_frame_hdr_start_offset;
+	uint32 eh_frame_hdr_end_offset;
+	uint32 module_object_offset;
+} ModHeader;
+
+typedef struct {
+	char   magic[0x4];
+	uint32 got_start_offset;
+	uint32 got_end_offset;
+} LnyHeader;
+
 struct {
 	ubyte text_segment[kip_header.text_segment_header.file_size];
 	if (kip_header.flags.Flags_TextCompress) {
@@ -358,5 +391,17 @@ struct {
 	if (kip_header.flags.Flags_DataCompress) {
 		FSeek(startof(data_segment) + kip_header.data_segment_header.file_size - 0xC);
 		SegmentFooter data_segment_footer;
+	}
+	if (!kip_header.flags.Flags_TextCompress && !kip_header.flags.Flags_RoCompress) {
+		FSeek(startof(text_segment));
+		ModStart mod_start;
+		if (exists(mod_start.reserved_1)) {
+			FSeek(startof(text_segment) + mod_start.ro_crt.mod_offset);
+			ModHeader mod_header;
+			LnyHeader lny_header;
+		} else {
+			FSeek(startof(ro_segment) + 0x14);
+			ModHeader mod_header;
+		}
 	}
 } kip_body;
