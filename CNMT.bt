@@ -1,7 +1,7 @@
 LittleEndian();
 DisplayFormatHex();
 
-local uint32 extended_data_size, i;
+local uint32 extended_data_size, i, content_meta_info_count, fragment_indicator_count;
 
 typedef enum <ubyte> {
 	ContentMetaType_SystemProgram        = 1,
@@ -36,6 +36,10 @@ typedef enum <ubyte> {
 } ContentInstallType;
 
 typedef struct {
+	ubyte InstallState_Committed : 1;
+} InstallState;
+
+typedef struct {
 	uint64 id;
 	uint32 version;
 	ContentMetaType content_meta_type;
@@ -46,9 +50,9 @@ typedef struct {
 	ContentMetaAttribute content_meta_attribute;
 	StorageId storage_id;
 	ContentInstallType content_install_type;
-	ubyte  reserved_2;
+	InstallState install_state;
 	uint32 required_download_system_version;
-	uint32 reserved_3;
+	uint32 reserved_2;
 } PackagedContentMetaHeader;
 
 typedef struct {
@@ -99,7 +103,7 @@ typedef struct {
 } ContentInfo;
 
 typedef struct {
-	ubyte digest[0x20];
+	ubyte hash[0x20];
 	ContentInfo content_info;
 } PackagedContentInfo;
 
@@ -137,9 +141,10 @@ typedef struct {
 		FirmwareVariationInfo2 firmware_variation_info[system_update_meta_extended_data_header.variation_count];
 		for (i = 0; i < system_update_meta_extended_data_header.variation_count; i++) {
 			if (!firmware_variation_info[i].refer_to_base) {
-				ContentMetaInfo content_meta_info[firmware_variation_info[i].meta_count];
+				content_meta_info_count += firmware_variation_info[i].meta_count;
 			}
 		}
+		ContentMetaInfo content_meta_info[content_meta_info_count];
 	}
 } SystemUpdateMetaExtendedData;
 
@@ -178,9 +183,15 @@ typedef struct {
 } PatchDeltaHistory;
 
 typedef struct {
-	uint16 content_info_index;
-	uint16 fragment_index;
-} FragmentIndicator;
+	uint64 source_patch_id;
+	uint64 destination_patch_id;
+	uint32 source_version;
+	uint32 destination_version;
+	uint16 fragment_set_count;
+	ubyte  reserved_1[0x6];
+	uint16 content_info_count;
+	ubyte  reserved_2[0x6];
+} PatchDeltaHeader;
 
 typedef enum <ubyte> {
 	UpdateType_ApplyAsDelta = 0,
@@ -202,15 +213,9 @@ typedef struct {
 } FragmentSet;
 
 typedef struct {
-	uint64 source_patch_id;
-	uint64 destination_patch_id;
-	uint32 source_version;
-	uint32 destination_version;
-	uint16 fragment_set_count;
-	ubyte  reserved_1[0x6];
-	uint16 content_info_count;
-	ubyte  reserved_2[0x6];
-} PatchDeltaHeader;
+	uint16 content_info_index;
+	uint16 fragment_index;
+} FragmentIndicator;
 
 typedef struct {
 	PatchMetaExtendedDataHeader patch_meta_extended_data_header;
@@ -221,8 +226,9 @@ typedef struct {
 	ContentInfo history_content_info[patch_meta_extended_data_header.history_content_count];
 	PackagedContentInfo delta_packaged_content_info[patch_meta_extended_data_header.delta_content_count];
 	for (i = 0; i < patch_meta_extended_data_header.fragment_set_count; i++) {
-		FragmentIndicator fragment_indicators[fragment_sets[i].fragment_count];
+		fragment_indicator_count += fragment_sets[i].fragment_count;
 	}
+	FragmentIndicator fragment_indicators[fragment_indicator_count];
 } PatchMetaExtendedData;
 
 typedef struct {
@@ -238,8 +244,9 @@ typedef struct {
 	DeltaMetaExtendedDataHeader delta_meta_extended_data_header;
 	FragmentSet fragment_sets[delta_meta_extended_data_header.fragment_set_count];
 	for (i = 0; i < patch_meta_extended_data_header.fragment_set_count; i++) {
-		FragmentIndicator fragment_indicators[fragment_sets[i].fragment_count];
+		fragment_indicator_count += fragment_sets[i].fragment_count;
 	}
+	FragmentIndicator fragment_indicators[fragment_indicator_count];
 } DeltaMetaExtendedData;
 
 struct {
