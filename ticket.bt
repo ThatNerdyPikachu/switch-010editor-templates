@@ -27,12 +27,12 @@ typedef enum <ubyte> {
 } LicenseType;
 
 typedef struct {
-	ubyte PropertyMask_PreInstallationFlag   : 1;
-	ubyte PropertyMask_SharedTitleFlag       : 1;
-	ubyte PropertyMask_AllContentsFlag       : 1;
+	ubyte PropertyMask_PreInstallation       : 1;
+	ubyte PropertyMask_SharedTitle           : 1;
+	ubyte PropertyMask_AllContents           : 1;
 	ubyte PropertyMask_DeviceLinkIndependent : 1;
-	ubyte PropertyMask_VolatileFlag          : 1;
-	ubyte PropertyMask_ELicenseRequiredFlag  : 1;
+	ubyte PropertyMask_Volatile              : 1;
+	ubyte PropertyMask_ELicenseRequired      : 1;
 } PropertyMask;
 
 typedef enum <uint16> {
