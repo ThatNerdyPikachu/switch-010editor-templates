@@ -1,0 +1,76 @@
+LittleEndian();
+DisplayFormatHex();
+
+struct PartitionFileSystemHeader {
+	char   magic[0x4];
+	uint32 entry_count;
+	uint32 name_table_size;
+	uint32 reserved_1;
+	struct PartitionEntry {
+		uint64 offset;
+		uint64 size;
+		uint32 name_offset;
+		if (magic == "PFS0") {
+			uint32 reserved_1;
+		} else if (magic == "HFS0") {
+			uint32 hash_target_size;
+			uint64 hash_target_offset;
+			ubyte  hash[0x20];
+		}
+	} partition_entries[entry_count] <optimize=true>;
+	char   name_table[name_table_size];
+} partition_file_system_header;
+
+local uint32 i;
+for (i = 0; i < partition_file_system_header.entry_count; i++) {
+	FSeek(sizeof(partition_file_system_header) + partition_file_system_header.partition_entries[i].offset);
+	struct PartitionFileData {
+		ubyte data[partition_file_system_header.partition_entries[i].size];
+	} partition_file_data;
+}
+
+string HexToString(ubyte in[]) {
+	local uint32 a;
+	local string out, dst;
+	for (a = 0; a < sizeof(in); a++) {
+		out += SPrintf(dst, "%02X", in[a]);
+	}
+	return out;
+}
+
+void Print() {
+	Printf("Partition File System Header:\n");
+	Printf("  Magic:                   %s\n", partition_file_system_header.magic);
+	Printf("  Entry Count:             %u\n", partition_file_system_header.entry_count);
+	Printf("  Name Table Size:         0x%X\n", partition_file_system_header.name_table_size);
+	Printf("  Partition Entries:\n");
+	for (i = 0; i < partition_file_system_header.entry_count; i++) {
+		Printf("    %08u (0x%08X):\n", i, startof(partition_file_system_header.partition_entries[i]) - 0x10);
+		Printf("      Offset:              0x%X\n", partition_file_system_header.partition_entries[i].offset);
+		Printf("      Size:                0x%X\n", partition_file_system_header.partition_entries[i].size);
+		Printf("      Name Offset:         0x%X\n", partition_file_system_header.partition_entries[i].name_offset);
+		if (partition_file_system_header.magic == "HFS0") {
+			Printf("      Hash Target Size:    0x%X\n", partition_file_system_header.partition_entries[i].hash_target_size);
+			Printf("      Hash Target Offset:  0x%X\n", partition_file_system_header.partition_entries[i].hash_target_offset);
+			Printf("      Hash:                %s\n", HexToString(partition_file_system_header.partition_entries[i].hash));
+		}
+		Printf("      Name:                %s\n", ReadString(startof(partition_file_system_header.name_table) + partition_file_system_header.partition_entries[i].name_offset));
+	}
+}
+
+void ReadFileSystem() {
+	Printf("Partition File System:\n");
+	if (partition_file_system_header.magic == "PFS0") {
+		local char path[] = "pfs:/";
+	} else if (partition_file_system_header.magic == "HFS0") {
+		local char path[] = "hfs:/";
+	}
+	for (i = 0; i < partition_file_system_header.entry_count; i++) {
+		Printf("  %s%s\n", path, ReadString(startof(partition_file_system_header.name_table) + partition_file_system_header.partition_entries[i].name_offset));
+	}
+}
+
+OutputPaneClear();
+Print();
+ReadFileSystem();
+OutputPaneCopy();
