@@ -70,37 +70,37 @@ typedef struct {
 	uint32 layer_count;
 	HierarchicalSha256LayerInfo hash_data_layer_info;
 	HierarchicalSha256LayerInfo hash_target_layer_info;
-} HierarchicalSha256; /* Used for PartitionFs and NCA0 RomFs */
+} HierarchicalSha256Data; /* Used for PartitionFs and NCA0 RomFs */
 
 typedef struct {
 	uint64 offset;
 	uint64 size;
 	uint32 block_size; /* 1 << block_size, log2(hash_block_size) */
 	uint32 reserved_1;
-} HierarchicalIntegrityLayerInfo;
+} IntegrityLayerInfo;
 
 typedef struct {
 	char   magic[0x4];
 	uint32 version;
 	uint32 master_hash_size;
 	uint32 layer_count;
-	HierarchicalIntegrityLayerInfo hash_data_layer_info[5];
-	HierarchicalIntegrityLayerInfo hash_target_layer_info;
+	IntegrityLayerInfo hash_data_layer_info[5];
+	IntegrityLayerInfo hash_target_layer_info;
 	ubyte  signature_salt[0x20];
 	ubyte  master_hash[master_hash_size];
-} HierarchicalIntegrity;
+} IntegrityMetaInfo;
 
 typedef struct {
 	if (hash_type == HashType_HierarchicalSha256) {
-		HierarchicalSha256 hierarchical_sha256;
+		HierarchicalSha256Data hierarchical_sha256_data;
 		ubyte reserved_1[0xB0];
 	} else if (hash_type == HashType_HierarchicalIntegrity) {
-		HierarchicalIntegrity hierarchical_integrity;
+		IntegrityMetaInfo integrity_meta_info;
 		ubyte reserved_1[0x18];
 	} else {
 		ubyte reserved_1[0xF8];
 	}
-} HashInfo;
+} HashData;
 
 typedef struct {
 	char   magic[0x4];
@@ -132,7 +132,7 @@ typedef struct {
 	HashType hash_type;
 	EncryptionType encryption_type;
 	ubyte  reserved_1[0x3];
-	HashInfo hash_info;
+	HashData hash_data;
 	PatchInfo patch_info;
 	uint32 generation;
 	uint32 secure_value; /* Program = 1 (nca_fs_headers[0]), 2 (nca_fs_headers[1]) - Manual = 4 (HtmlDocument), 5 (LegalInformation) */
@@ -197,7 +197,7 @@ typedef struct {
 	uint32 next_offset;
 	uint32 directory_offset;
 	uint32 file_offset;
-	uint32 hash_offset;
+	uint32 bucket_offset;
 	uint32 name_length;
 	char   name[name_length];
 	ubyte  reserved_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
@@ -208,7 +208,7 @@ typedef struct {
 	uint32 next_offset;
 	uint64 offset;
 	uint64 size;
-	uint32 hash_offset;
+	uint32 bucket_offset;
 	uint32 name_length;
 	char   name[name_length];
 	ubyte  reserved_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
@@ -290,11 +290,11 @@ for (i = 0; i < 4; i++) {
 	if (nca_header.fs_entries[i].enable_entry) {
 		if (nca_header.nca_fs_headers[i].format_type == FormatType_RomFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
 			if (nca_header.magic == "NCA0") {
-				fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_info.hierarchical_sha256.hash_target_layer_info.offset;
+				fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_data.hierarchical_sha256_data.hash_target_layer_info.offset;
 				FSeek(fs_offset);
 				RomFileSystemInformationOld rom_file_system_information;
 			} else {
-				fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_info.hierarchical_integrity.hash_target_layer_info.offset;
+				fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_data.integrity_meta_info.hash_target_layer_info.offset;
 				FSeek(fs_offset);
 				RomFileSystemInformation rom_file_system_information;
 			}
@@ -316,7 +316,7 @@ for (i = 0; i < 4; i++) {
 				RomFileData rom_file_data;
 			}
 		} else if (nca_header.nca_fs_headers[i].format_type == FormatType_PartitionFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
-			fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_info.hierarchical_sha256.hash_target_layer_info.offset;
+			fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_data.hierarchical_sha256_data.hash_target_layer_info.offset;
 			FSeek(fs_offset);
 			PartitionFileSystemHeader partition_file_system_header;
 			for (j = 0; j < partition_file_system_header.entry_count; j++) {
