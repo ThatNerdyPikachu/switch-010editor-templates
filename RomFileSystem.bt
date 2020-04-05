@@ -1,0 +1,171 @@
+LittleEndian();
+DisplayFormatHex();
+
+local uint32 i, rom_directory_entry_count, rom_file_entry_count;
+
+struct RomFileSystemInformationOld {
+	uint32 header_size;
+	uint32 directory_bucket_offset;
+	uint32 directory_bucket_size;
+	uint32 directory_entry_offset;
+	uint32 directory_entry_size;
+	uint32 file_bucket_offset;
+	uint32 file_bucket_size;
+	uint32 file_entry_offset;
+	uint32 file_entry_size;
+	uint32 body_offset;
+};
+
+struct RomFileSystemInformation {
+	uint64 header_size;
+	uint64 directory_bucket_offset;
+	uint64 directory_bucket_size;
+	uint64 directory_entry_offset;
+	uint64 directory_entry_size;
+	uint64 file_bucket_offset;
+	uint64 file_bucket_size;
+	uint64 file_entry_offset;
+	uint64 file_entry_size;
+	uint64 body_offset;
+};
+
+if (ReadUInt(0x0) == 0x28) { /* NCA0 (NCA1?) */
+	RomFileSystemInformationOld rom_file_system_information;
+} else if (ReadUInt64(0x0) == 0x50) { /* NCA2/NCA3 */
+	RomFileSystemInformation rom_file_system_information;
+}
+
+FSeek(rom_file_system_information.directory_bucket_offset);
+local uint32 rom_directory_bucket_count = rom_file_system_information.directory_bucket_size >> 2;
+uint32 rom_directory_buckets[rom_directory_bucket_count];
+
+FSeek(rom_file_system_information.directory_entry_offset);
+while (FTell() < (rom_file_system_information.directory_entry_offset + rom_file_system_information.directory_entry_size)) {
+	struct RomDirectoryEntry {
+		uint32 parent_offset;
+		uint32 next_offset;
+		uint32 directory_offset;
+		uint32 file_offset;
+		uint32 bucket_offset;
+		uint32 name_length;
+		char   name[name_length];
+		ubyte  reserved_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
+	} rom_directory_entry;
+	rom_directory_entry_count++;
+}
+
+FSeek(rom_file_system_information.file_bucket_offset);
+local uint32 rom_file_bucket_count = rom_file_system_information.file_bucket_size >> 2;
+uint32 rom_file_buckets[rom_file_bucket_count];
+
+FSeek(rom_file_system_information.file_entry_offset);
+while (FTell() < (rom_file_system_information.file_entry_offset + rom_file_system_information.file_entry_size)) {
+	struct RomFileEntry {
+		uint32 parent_offset;
+		uint32 next_offset;
+		uint64 offset;
+		uint64 size;
+		uint32 bucket_offset;
+		uint32 name_length;
+		char   name[name_length];
+		ubyte  reserved_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
+	} rom_file_entry;
+	rom_file_entry_count++;
+}
+
+for (i = 0; i < rom_file_entry_count; i++) {
+	FSeek(rom_file_system_information.body_offset + rom_file_entry[i].offset);
+	struct RomFileData {
+		ubyte data[rom_file_entry[i].size];
+	} rom_file_data;
+}
+
+void Print() {
+	Printf("Rom File System Information:\n");
+	Printf("  Header Size:             0x%X\n", rom_file_system_information.header_size);
+	Printf("  Directory Bucket Offset: 0x%X\n", rom_file_system_information.directory_bucket_offset);
+	Printf("  Directory Bucket Size:   0x%X\n", rom_file_system_information.directory_bucket_size);
+	Printf("  Directory Entry Offset:  0x%X\n", rom_file_system_information.directory_entry_offset);
+	Printf("  Directory Entry Size:    0x%X\n", rom_file_system_information.directory_entry_size);
+	Printf("  File Bucket Offset:      0x%X\n", rom_file_system_information.file_bucket_offset);
+	Printf("  File Bucket Size:        0x%X\n", rom_file_system_information.file_bucket_size);
+	Printf("  File Entry Offset:       0x%X\n", rom_file_system_information.file_entry_offset);
+	Printf("  File Entry Size:         0x%X\n", rom_file_system_information.file_entry_size);
+	Printf("  Body Offset:             0x%X\n", rom_file_system_information.body_offset);
+
+	Printf("Rom Directory Buckets:\n");
+	for (i = 0; i < rom_directory_bucket_count; i++) {
+		Printf("  %08u (0x%08X):   0x%X\n", i, startof(rom_directory_buckets[i]) - rom_file_system_information.directory_bucket_offset, rom_directory_buckets[i]);
+	}
+
+	Printf("Rom Directory Entries:\n");
+	for (i = 0; i < rom_directory_entry_count; i++) {
+		Printf("  %08u (0x%08X):\n", i, startof(rom_directory_entry[i]) - rom_file_system_information.directory_entry_offset);
+		Printf("    Parent Offset:         0x%X\n", rom_directory_entry[i].parent_offset);
+		Printf("    Next Offset:           0x%X\n", rom_directory_entry[i].next_offset);
+		Printf("    Directory Offset:      0x%X\n", rom_directory_entry[i].directory_offset);
+		Printf("    File Offset:           0x%X\n", rom_directory_entry[i].file_offset);
+		Printf("    Bucket Offset:         0x%X\n", rom_directory_entry[i].bucket_offset);
+		Printf("    Name Length            0x%X\n", rom_directory_entry[i].name_length);
+		Printf("    Name:                  %s\n", rom_directory_entry[i].name_length ? rom_directory_entry[i].name : "");
+	}
+	
+	Printf("Rom File Buckets:\n");
+	for (i = 0; i < rom_file_bucket_count; i++) {
+		Printf("  %08u (0x%08X):   0x%X\n", i, startof(rom_file_buckets[i]) - rom_file_system_information.file_bucket_offset, rom_file_buckets[i]);
+	}
+
+	Printf("Rom File Entries:\n");
+	for (i = 0; i < rom_file_entry_count; i++) {
+		Printf("  %08u (0x%08X):\n", i, startof(rom_file_entry[i]) - rom_file_system_information.file_entry_offset);
+		Printf("    Parent Offset:         0x%X\n", rom_file_entry[i].parent_offset);
+		Printf("    Next Offset:           0x%X\n", rom_file_entry[i].next_offset);
+		Printf("    Offset:                0x%LX\n", rom_file_entry[i].offset);
+		Printf("    Size:                  0x%LX\n", rom_file_entry[i].size);
+		Printf("    Bucket Offset:         0x%X\n", rom_file_entry[i].bucket_offset);
+		Printf("    Name Length:           0x%X\n", rom_file_entry[i].name_length);
+		Printf("    Name:                  %s\n", rom_file_entry[i].name);
+	}
+}
+
+void VisitFile(uint32 entry_offset, char directory_path[]) {
+	local char current_path[] = "";
+	local uint32 rom_file_entry_offset;
+	while (entry_offset != 0xFFFFFFFF) {
+		rom_file_entry_offset = rom_file_system_information.file_entry_offset + entry_offset;
+		current_path = directory_path + ReadString(rom_file_entry_offset + 0x20, ReadUInt(rom_file_entry_offset + 0x1C));
+		Printf("  romfs:/%s\n", current_path);
+		entry_offset = ReadUInt(rom_file_entry_offset + 0x4);
+	}
+}
+
+void VisitDirectory(uint32 entry_offset, char root_path[]) {
+	local char current_path[] = root_path;
+	local uint32 rom_directory_entry_offset = rom_file_system_information.directory_entry_offset + entry_offset;
+	local uint32 name_length = ReadUInt(rom_directory_entry_offset + 0x14);
+	if (name_length) {
+		current_path += ReadString(rom_directory_entry_offset + 0x18, name_length) + "/";
+	}
+	local uint32 file_offset = ReadUInt(rom_directory_entry_offset + 0xC);
+	if (file_offset != 0xFFFFFFFF) {
+		VisitFile(file_offset, current_path);
+	}
+	local uint32 directory_offset = ReadUInt(rom_directory_entry_offset + 0x8);
+	if (directory_offset != 0xFFFFFFFF) {
+		VisitDirectory(directory_offset, current_path);
+	}
+	local uint32 next_offset = ReadUInt(rom_directory_entry_offset + 0x4);
+	if (next_offset != 0xFFFFFFFF) {
+		VisitDirectory(next_offset, root_path);
+	}
+}
+
+void ReadFileSystem() {
+	Printf("Rom File System:\n");
+	VisitDirectory(0x0, "");
+}
+
+OutputPaneClear();
+Print(); /* Comment this out for large RomFs archives. */
+ReadFileSystem();
+OutputPaneCopy();
