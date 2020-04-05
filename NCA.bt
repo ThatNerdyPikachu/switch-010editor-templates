@@ -40,9 +40,9 @@ typedef struct {
 } EncryptedKey;
 
 typedef enum <ubyte> {
-	FormatType_RomFs       = 0,
-	FormatType_PartitionFs = 1
-} FormatType;
+	FsType_RomFs       = 0,
+	FsType_PartitionFs = 1
+} FsType;
 
 typedef enum <ubyte> {
 	HashType_Auto                  = 0,
@@ -128,7 +128,7 @@ typedef struct {
 
 typedef struct {
 	uint16 version;
-	FormatType format_type;
+	FsType fs_type;
 	HashType hash_type;
 	EncryptionType encryption_type;
 	ubyte  reserved_1[0x3];
@@ -288,7 +288,7 @@ typedef struct {
 
 for (i = 0; i < 4; i++) {
 	if (nca_header.fs_entries[i].enable_entry) {
-		if (nca_header.nca_fs_headers[i].format_type == FormatType_RomFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
+		if (nca_header.nca_fs_headers[i].fs_type == FsType_RomFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
 			if (nca_header.magic == "NCA0") {
 				fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_data.hierarchical_sha256_data.hash_target_layer_info.offset;
 				FSeek(fs_offset);
@@ -315,7 +315,7 @@ for (i = 0; i < 4; i++) {
 				FSeek(fs_offset + rom_file_system_information.body_offset + rom_file_entry[j].offset);
 				RomFileData rom_file_data;
 			}
-		} else if (nca_header.nca_fs_headers[i].format_type == FormatType_PartitionFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
+		} else if (nca_header.nca_fs_headers[i].fs_type == FsType_PartitionFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
 			fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_data.hierarchical_sha256_data.hash_target_layer_info.offset;
 			FSeek(fs_offset);
 			PartitionFileSystemHeader partition_file_system_header;
@@ -323,7 +323,7 @@ for (i = 0; i < 4; i++) {
 				FSeek(fs_offset + sizeof(partition_file_system_header) + partition_file_system_header.partition_entries[j].offset);
 				PartitionFileData partition_file_data;
 			}
-		} else if (nca_header.nca_fs_headers[i].format_type == FormatType_RomFs && nca_header.nca_fs_headers[i].encryption_type == EncryptionType_AesCtrEx) {
+		} else if (nca_header.nca_fs_headers[i].encryption_type == EncryptionType_AesCtrEx) {
 			FSeek((nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].patch_info.indirect_offset);
 			if (ReadUInt() != 0) break; /* Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong - use hactoolnet instead */
 			IndirectStorageBlock indirect_storage_block;
