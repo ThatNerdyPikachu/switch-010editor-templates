@@ -1,0 +1,21 @@
+//RunTemplate("PartitionFileSystem.bt"); /* Running this crashes every time for me on v10.0.1. Uncomment this when a fix is released. */
+/* For now, just manually run the template before running the script. */
+local uint32 original_file = GetFileNum();
+local uint32 input_type = InputRadioButtonBox("", "", 0, "Extract all files in file system.", "Extract specific file from file system.");
+local char input_string[];
+if (input_type == 1) input_string = InputString("", "File Name/Base/Extension:", "");
+local char directory[] = FileNameGetPath(GetFileName());
+local char name[];
+for (i = 0; i < partition_file_system_header.entry_count; i++) {
+	name = ReadString(startof(partition_file_system_header.name_table) + partition_file_system_header.partition_entries[i].name_offset);
+	if (input_type == 0) input_string = name;
+	if (name == input_string || FileNameGetBase(name, false) == input_string || FileNameGetExtension(name) == input_string) {
+		SetSelection(startof(partition_file_data[i]), sizeof(partition_file_data[i]));
+		CopyToClipboard();
+		FileNew("Hex");
+		PasteFromClipboard();
+		FileSave(directory + name);
+		FileClose();
+		FileSelect(original_file);
+	}
+}
