@@ -1,10 +1,18 @@
 LittleEndian();
 DisplayFormatHex();
 
-local uint32 extended_data_size = 0;
+local uint32 extended_data_size;
 
 /* ContentMeta */
-typedef enum <ubyte> {
+struct Version {
+	uint32 Version_MinorRelstep : 8;
+	uint32 Version_MajorRelstep : 8;
+	uint32 Version_Micro        : 4;
+	uint32 Version_Minor        : 6;
+	uint32 Version_Major        : 6;
+};
+
+enum <ubyte> ContentMetaType {
 	ContentMetaType_SystemProgram        = 1,
 	ContentMetaType_SystemData           = 2,
 	ContentMetaType_SystemUpdate         = 3,
@@ -14,27 +22,28 @@ typedef enum <ubyte> {
 	ContentMetaType_Patch                = 129,
 	ContentMetaType_AddOnContent         = 130,
 	ContentMetaType_Delta                = 131
-} ContentMetaType;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> ContentInstallType {
 	ContentInstallType_Full         = 0,
 	ContentInstallType_FragmentOnly = 1
-} ContentInstallType;
+};
 
-typedef struct {
+struct ContentMetaKey {
 	uint64 id;
-	uint32 version;
+	Version version;
 	ContentMetaType content_meta_type;
 	ContentInstallType content_install_type;
 	uint16 reserved_1;
-} ContentMetaKey;
+};
 
-typedef struct {
+struct ContentMetaAttribute {
 	ubyte ContentMetaAttribute_IncludesExFatDriver : 1;
 	ubyte ContentMetaAttribute_Rebootless          : 1;
-} ContentMetaAttribute;
+	ubyte ContentMetaAttribute_Reserved1           : 6;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> StorageId {
 	StorageId_None          = 0,
 	StorageId_Host          = 1,
 	StorageId_GameCard      = 2,
@@ -42,46 +51,46 @@ typedef enum <ubyte> {
 	StorageId_BuiltInUser   = 4,
 	StorageId_SdCard        = 5,
 	StorageId_Any           = 6
-} StorageId;
+};
 
-typedef struct {
+struct ContentMetaHeader {
 	uint16 extended_header_size;
 	uint16 content_count;
 	uint16 content_meta_count;
 	ContentMetaAttribute content_meta_attribute;
 	StorageId storage_id;
-} ContentMetaHeader;
+};
 
-typedef struct {
+struct SystemUpdateMetaExtendedHeader {
 	uint32 extended_data_size;
-} SystemUpdateMetaExtendedHeader;
+};
 
-typedef struct {
+struct ApplicationMetaExtendedHeader {
 	uint64 patch_id;
-	uint32 required_system_version;
-	uint32 required_application_version;
-} ApplicationMetaExtendedHeader;
+	Version required_system_version;
+	Version required_application_version;
+};
 
-typedef struct {
+struct PatchMetaExtendedHeader {
 	uint64 application_id;
-	uint32 required_system_version;
+	Version required_system_version;
 	uint32 extended_data_size;
 	uint64 reserved_1;
-} PatchMetaExtendedHeader;
+};
 
-typedef struct {
+struct AddOnContentMetaExtendedHeader {
 	uint64 application_id;
-	uint32 required_application_version;
+	Version required_application_version;
 	uint32 reserved_1;
-} AddOnContentMetaExtendedHeader;
+};
 
-typedef struct {
+struct DeltaMetaExtendedHeader {
 	uint64 application_id;
 	uint32 extended_data_size;
 	uint32 reserved_1;
-} DeltaMetaExtendedHeader;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> ContentType {
 	ContentType_Meta             = 0,
 	ContentType_Program          = 1,
 	ContentType_Data             = 2,
@@ -89,25 +98,25 @@ typedef enum <ubyte> {
 	ContentType_HtmlDocument     = 4,
 	ContentType_LegalInformation = 5,
 	ContentType_DeltaFragment    = 6
-} ContentType;
+};
 
-typedef struct {
+struct ContentInfo {
 	ubyte  content_id[0x10];
 	uint32 size_low;
 	uint16 size_high;
 	ContentType content_type;
 	ubyte  id_offset;
-} ContentInfo;
+};
 
-typedef struct {
+struct ContentMetaInfo {
 	uint64 id;
-	uint32 version;
+	Version version;
 	ContentMetaType content_meta_type;
 	ContentMetaAttribute content_meta_attribute;
 	uint16 reserved_1;
-} ContentMetaInfo;
+};
 
-typedef struct {
+struct ContentMeta {
 	ContentMetaKey content_meta_key;
 	ContentMetaHeader content_meta_header;
 	if (content_meta_header.extended_header_size > 0) {
@@ -136,10 +145,10 @@ typedef struct {
 	ContentMetaInfo content_meta_info[content_meta_header.content_meta_count];
 	ubyte extended_data[extended_data_size]; /* Looks like this is empty for everything but SystemUpdate, but the data is incorrect. */
 	extended_data_size = 0;
-} ContentMeta;
+};
 
 /* SaveData */
-typedef enum <ubyte> {
+enum <ubyte> SaveDataType {
 	SaveDataType_System     = 0,
 	SaveDataType_Account    = 1,
 	SaveDataType_Bcat       = 2,
@@ -147,14 +156,14 @@ typedef enum <ubyte> {
 	SaveDataType_Temporary  = 4,
 	SaveDataType_Cache      = 5,
 	SaveDataType_SystemBcat = 6
-} SaveDataType;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> SaveDataRank {
 	SaveDataRank_Primary   = 0,
 	SaveDataRank_Secondary = 1
-} SaveDataRank;
+};
 
-typedef struct {
+struct SaveDataAttribute {
 	uint64 application_id;
 	ubyte  user_id[0x10];
 	uint64 save_data_id;
@@ -162,9 +171,9 @@ typedef struct {
 	SaveDataRank save_data_rank;
 	uint16 save_data_index;
 	ubyte  reserved_1[0x1C];
-} SaveDataAttribute;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> SaveDataSpaceId {
 	SaveDataSpaceId_BuiltInSystem = 0,
 	SaveDataSpaceId_BuiltInUser   = 1,
 	SaveDataSpaceId_SdCardSystem  = 2,
@@ -173,38 +182,38 @@ typedef enum <ubyte> {
 	SaveDataSpaceId_ProperSystem  = 100,
 	SaveDataSpaceId_SafeMode      = 101,
 	SaveDataSpaceId_BisAuto       = 127
-} SaveDataSpaceId;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> SaveDataState {
 	SaveDataState_Normal  = 0,
 	SaveDataState_Create  = 1,
 	SaveDataState_Unknown = 2,
 	SaveDataState_Delete  = 3,
 	SaveDataState_Extend  = 4
-} SaveDataState;
+};
 
-typedef struct {
+struct SaveDataIndexer {
 	uint64 save_data_id;
 	uint64 save_data_size;
 	uint64 reserved_1;
 	SaveDataSpaceId save_data_space_id;
 	SaveDataState save_data_state;
 	ubyte  reserved_2[0x26];
-} SaveDataIndexer;
+};
 
-typedef struct {
+struct SaveData {
 	SaveDataAttribute save_data_attribute;
 	SaveDataIndexer save_data_indexer;
-} SaveData;
+};
 
 /* IMKVDB */
-struct {
+struct KvdbHeader {
 	char   magic[0x4];
 	uint32 reserved_1;
 	uint32 entry_count;
 } kvdb_header;
 
-struct {
+struct KvdbEntry {
 	char   magic[0x4];
 	uint32 key_size;
 	uint32 value_size;
