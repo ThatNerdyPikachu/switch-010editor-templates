@@ -3,7 +3,15 @@ DisplayFormatHex();
 
 local uint32 extended_data_size, i, content_meta_info_count, fragment_indicator_count;
 
-typedef enum <ubyte> {
+struct Version {
+	uint32 Version_MinorRelstep : 8;
+	uint32 Version_MajorRelstep : 8;
+	uint32 Version_Micro        : 4;
+	uint32 Version_Minor        : 6;
+	uint32 Version_Major        : 6;
+};
+
+enum <ubyte> ContentMetaType {
 	ContentMetaType_SystemProgram        = 1,
 	ContentMetaType_SystemData           = 2,
 	ContentMetaType_SystemUpdate         = 3,
@@ -13,14 +21,15 @@ typedef enum <ubyte> {
 	ContentMetaType_Patch                = 129,
 	ContentMetaType_AddOnContent         = 130,
 	ContentMetaType_Delta                = 131
-} ContentMetaType;
+};
 
-typedef struct {
+struct ContentMetaAttribute {
 	ubyte ContentMetaAttribute_IncludesExFatDriver : 1;
 	ubyte ContentMetaAttribute_Rebootless          : 1;
-} ContentMetaAttribute;
+	ubyte ContentMetaAttribute_Reserved1           : 6;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> StorageId {
 	StorageId_None          = 0,
 	StorageId_Host          = 1,
 	StorageId_GameCard      = 2,
@@ -28,20 +37,21 @@ typedef enum <ubyte> {
 	StorageId_BuiltInUser   = 4,
 	StorageId_SdCard        = 5,
 	StorageId_Any           = 6
-} StorageId;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> ContentInstallType {
 	ContentInstallType_Full         = 0,
 	ContentInstallType_FragmentOnly = 1
-} ContentInstallType;
+};
 
-typedef struct {
+struct InstallState {
 	ubyte InstallState_Committed : 1;
-} InstallState;
+	ubyte InstallState_Reserved1 : 7;
+};
 
-typedef struct {
+struct PackagedContentMetaHeader {
 	uint64 id;
-	uint32 version;
+	Version version;
 	ContentMetaType content_meta_type;
 	ubyte  reserved_1;
 	uint16 extended_header_size;
@@ -51,40 +61,40 @@ typedef struct {
 	StorageId storage_id;
 	ContentInstallType content_install_type;
 	InstallState install_state;
-	uint32 required_download_system_version;
+	Version required_download_system_version;
 	uint32 reserved_2;
-} PackagedContentMetaHeader;
+};
 
-typedef struct {
+struct SystemUpdateMetaExtendedHeader {
 	uint32 extended_data_size;
-} SystemUpdateMetaExtendedHeader;
+};
 
-typedef struct {
+struct ApplicationMetaExtendedHeader {
 	uint64 patch_id;
-	uint32 required_system_version;
-	uint32 required_application_version;
-} ApplicationMetaExtendedHeader;
+	Version required_system_version;
+	Version required_application_version;
+};
 
-typedef struct {
+struct PatchMetaExtendedHeader {
 	uint64 application_id;
-	uint32 required_system_version;
+	Version required_system_version;
 	uint32 extended_data_size;
 	uint64 reserved_1;
-} PatchMetaExtendedHeader;
+};
 
-typedef struct {
+struct AddOnContentMetaExtendedHeader {
 	uint64 application_id;
-	uint32 required_application_version;
+	Version required_application_version;
 	uint32 reserved_1;
-} AddOnContentMetaExtendedHeader;
+};
 
-typedef struct {
+struct DeltaMetaExtendedHeader {
 	uint64 application_id;
 	uint32 extended_data_size;
 	uint32 reserved_1;
-} DeltaMetaExtendedHeader;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> ContentType {
 	ContentType_Meta             = 0,
 	ContentType_Program          = 1,
 	ContentType_Data             = 2,
@@ -92,53 +102,53 @@ typedef enum <ubyte> {
 	ContentType_HtmlDocument     = 4,
 	ContentType_LegalInformation = 5,
 	ContentType_DeltaFragment    = 6
-} ContentType;
+};
 
-typedef struct {
+struct ContentInfo {
 	ubyte  content_id[0x10];
 	uint32 size_low;
 	uint16 size_high;
 	ContentType content_type;
 	ubyte  id_offset;
-} ContentInfo;
+};
 
-typedef struct {
+struct PackagedContentInfo {
 	ubyte hash[0x20];
 	ContentInfo content_info;
-} PackagedContentInfo;
+};
 
-typedef struct {
+struct ContentMetaInfo {
 	uint64 id;
-	uint32 version;
+	Version version;
 	ContentMetaType content_meta_type;
 	ContentMetaAttribute content_meta_attribute;
 	uint16 reserved_1;
-} ContentMetaInfo;
+};
 
-typedef struct {
+struct SystemUpdateMetaExtendedDataHeader {
 	uint32 version;
 	uint32 variation_count;
-} SystemUpdateMetaExtendedDataHeader;
+};
 
-typedef struct {
+struct FirmwareVariationInfoV1 {
 	uint32 firmware_variation_id;
 	ubyte  reserved_1[0x1C];
-} FirmwareVariationInfo1;
+};
 
-typedef struct {
+struct FirmwareVariationInfoV2 {
 	ubyte  refer_to_base;
 	ubyte  reserved_1[0x3];
 	uint32 meta_count;
 	ubyte  reserved_2[0x18];
-} FirmwareVariationInfo2;
+};
 
-typedef struct {
+struct SystemUpdateMetaExtendedData {
 	SystemUpdateMetaExtendedDataHeader system_update_meta_extended_data_header;
 	if (system_update_meta_extended_data_header.version == 1) {
-		FirmwareVariationInfo1 firmware_variation_info[system_update_meta_extended_data_header.variation_count];
+		FirmwareVariationInfoV1 firmware_variation_info[system_update_meta_extended_data_header.variation_count];
 	} else if (system_update_meta_extended_data_header.version == 2) {
 		uint32 firmware_variation_ids[system_update_meta_extended_data_header.variation_count];
-		FirmwareVariationInfo2 firmware_variation_info[system_update_meta_extended_data_header.variation_count];
+		FirmwareVariationInfoV2 firmware_variation_info[system_update_meta_extended_data_header.variation_count];
 		for (i = 0; i < system_update_meta_extended_data_header.variation_count; i++) {
 			if (!firmware_variation_info[i].refer_to_base) {
 				content_meta_info_count += firmware_variation_info[i].meta_count;
@@ -146,9 +156,9 @@ typedef struct {
 		}
 		ContentMetaInfo content_meta_info[content_meta_info_count];
 	}
-} SystemUpdateMetaExtendedData;
+};
 
-typedef struct {
+struct PatchMetaExtendedDataHeader {
 	uint32 history_count;
 	uint32 delta_history_count;
 	uint32 delta_count;
@@ -156,50 +166,50 @@ typedef struct {
 	uint32 history_content_count;
 	uint32 delta_content_count;
 	uint32 reserved_1;
-} PatchMetaExtendedDataHeader;
+};
 
-typedef struct {
+struct ContentMetaKey {
 	uint64 id;
-	uint32 version;
+	Version version;
 	ContentMetaType content_meta_type;
 	ContentInstallType content_install_type;
 	uint16 reserved_1;
-} ContentMetaKey;
+};
 
-typedef struct {
+struct PatchHistoryHeader {
 	ContentMetaKey content_meta_key;
 	ubyte  digest[0x20];
 	uint16 content_info_count;
 	ubyte  reserved_1[0x6];
-} PatchHistoryHeader;
+};
 
-typedef struct {
+struct PatchDeltaHistory {
 	uint64 source_patch_id;
 	uint64 destination_patch_id;
-	uint32 source_version;
-	uint32 destination_version;
+	Version source_version;
+	Version destination_version;
 	uint64 download_size;
 	uint64 reserved_1;
-} PatchDeltaHistory;
+};
 
-typedef struct {
+struct PatchDeltaHeader {
 	uint64 source_patch_id;
 	uint64 destination_patch_id;
-	uint32 source_version;
-	uint32 destination_version;
+	Version source_version;
+	Version destination_version;
 	uint16 fragment_set_count;
 	ubyte  reserved_1[0x6];
 	uint16 content_info_count;
 	ubyte  reserved_2[0x6];
-} PatchDeltaHeader;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> UpdateType {
 	UpdateType_ApplyAsDelta = 0,
 	UpdateType_Overwrite    = 1,
 	UpdateType_Create       = 2
-} UpdateType;
+};
 
-typedef struct {
+struct FragmentSet {
 	ubyte  source_content_id[0x10];
 	ubyte  destination_content_id[0x10];
 	uint32 source_size_low;
@@ -210,14 +220,14 @@ typedef struct {
 	ContentType fragment_target_content_type;
 	UpdateType update_type;
 	uint32 reserved_1;
-} FragmentSet;
+};
 
-typedef struct {
+struct FragmentIndicator {
 	uint16 content_info_index;
 	uint16 fragment_index;
-} FragmentIndicator;
+};
 
-typedef struct {
+struct PatchMetaExtendedData {
 	PatchMetaExtendedDataHeader patch_meta_extended_data_header;
 	PatchHistoryHeader patch_history_headers[patch_meta_extended_data_header.history_count];
 	PatchDeltaHistory patch_delta_histories[patch_meta_extended_data_header.delta_history_count];
@@ -229,27 +239,27 @@ typedef struct {
 		fragment_indicator_count += fragment_sets[i].fragment_count;
 	}
 	FragmentIndicator fragment_indicators[fragment_indicator_count];
-} PatchMetaExtendedData;
+};
 
-typedef struct {
+struct DeltaMetaExtendedDataHeader {
 	uint64 source_patch_id;
 	uint64 destination_patch_id;
-	uint32 source_version;
-	uint32 destination_version;
+	Version source_version;
+	Version destination_version;
 	uint16 fragment_set_count;
 	ubyte  reserved_1[0x6];
-} DeltaMetaExtendedDataHeader;
+};
 
-typedef struct {
+struct DeltaMetaExtendedData {
 	DeltaMetaExtendedDataHeader delta_meta_extended_data_header;
 	FragmentSet fragment_sets[delta_meta_extended_data_header.fragment_set_count];
 	for (i = 0; i < patch_meta_extended_data_header.fragment_set_count; i++) {
 		fragment_indicator_count += fragment_sets[i].fragment_count;
 	}
 	FragmentIndicator fragment_indicators[fragment_indicator_count];
-} DeltaMetaExtendedData;
+};
 
-struct {
+struct PackagedContentMeta {
 	PackagedContentMetaHeader packaged_content_meta_header;
 	if (packaged_content_meta_header.extended_header_size != 0) {
 		switch (packaged_content_meta_header.content_meta_type) {
