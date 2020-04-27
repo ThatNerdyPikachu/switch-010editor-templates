@@ -1,20 +1,20 @@
 LittleEndian();
 DisplayFormatHex();
 
-struct {
-	uint32 file_size;
+struct SettingsHeader {
+	uint32 size;
 } settings_header;
 
-typedef enum <ubyte> {
+enum <ubyte> ValueType {
 	ValueType_String = 1,
 	ValueType_Flag   = 2,
 	ValueType_Data   = 3
-} ValueType;
+};
 
-while (FTell() < settings_header.file_size) {
-	struct {
-		uint32 name_size;
-		char   name[name_size];
+while (FTell() < settings_header.size) {
+	struct SettingsEntry {
+		uint32 key_size;
+		char   key[key_size];
 		ValueType value_type;
 		uint32 value_size;
 		switch (value_type) {
