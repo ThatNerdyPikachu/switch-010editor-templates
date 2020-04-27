@@ -1,23 +1,25 @@
 LittleEndian();
 DisplayFormatHex();
 
+struct PartitionEntry {
+	uint64 offset;
+	uint64 size;
+	uint32 name_offset;
+	if (magic == "PFS0") {
+		uint32 reserved_1;
+	} else if (magic == "HFS0") {
+		uint32 hash_target_size;
+		uint64 hash_target_offset;
+		ubyte  hash[0x20];
+	}
+};
+
 struct PartitionFileSystemHeader {
 	char   magic[0x4];
 	uint32 entry_count;
 	uint32 name_table_size;
 	uint32 reserved_1;
-	struct PartitionEntry {
-		uint64 offset;
-		uint64 size;
-		uint32 name_offset;
-		if (magic == "PFS0") {
-			uint32 reserved_1;
-		} else if (magic == "HFS0") {
-			uint32 hash_target_size;
-			uint64 hash_target_offset;
-			ubyte  hash[0x20];
-		}
-	} partition_entries[entry_count] <optimize=true>;
+	PartitionEntry partition_entries[entry_count];
 	char   name_table[name_table_size];
 } partition_file_system_header;
 
@@ -31,7 +33,7 @@ for (i = 0; i < partition_file_system_header.entry_count; i++) {
 
 string HexToString(ubyte in[]) {
 	local uint32 a;
-	local string out, dst;
+	local char out[], dst[];
 	for (a = 0; a < sizeof(in); a++) {
 		out += SPrintf(dst, "%02X", in[a]);
 	}
