@@ -1,7 +1,7 @@
 LittleEndian();
 DisplayFormatHex();
 
-struct {
+struct Package2Header {
 	ubyte  signature[0x100];
 	ubyte  header_ctr[0x10];
 	ubyte  kernel_ctr[0x10];
@@ -10,8 +10,8 @@ struct {
 	ubyte  reserved_1[0x10];
 	char   magic[0x4];
 	if (magic != "PK21") {
-		Warning("File is not decrypted.");
-		Exit(-1);
+		Warning("File is not decrypted or is not a valid file.");
+		Exit(0);
 	}
 	uint32 base_offset;
 	uint32 reserved_2;
@@ -30,10 +30,10 @@ struct {
 	ubyte  ini_hash[0x20];
 	ubyte  unused_hash[0x20];
 	ubyte  reserved_6[0x20];
-} pk21_header;
+} package2_header;
 
-struct {
-	ubyte kernel[pk21_header.kernel_size];
-	ubyte ini[pk21_header.ini_size];
-	ubyte unused[pk21_header.unused_size];
-} pk21_body;
+struct Package2Body {
+	ubyte kernel_section[package2_header.kernel_size];
+	ubyte ini_section[package2_header.ini_size];
+	ubyte unused_section[package2_header.unused_size];
+} package2_body;
