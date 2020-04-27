@@ -1,27 +1,28 @@
 LittleEndian();
 DisplayFormatHex();
 
-typedef struct {
+struct Flags {
 	uint32 Flags_TextCompress : 1;
 	uint32 Flags_RoCompress   : 1;
 	uint32 Flags_DataCompress : 1;
 	uint32 Flags_TextHash     : 1;
 	uint32 Flags_RoHash       : 1;
 	uint32 Flags_DataHash     : 1;
-} Flags;
+	uint32 Flags_Reserved1    : 26;
+};
 
-typedef struct {
+struct SegmentHeader {
 	uint32 file_offset;
 	uint32 memory_offset;
 	uint32 size;
-} SegmentHeader;
+};
 
-typedef struct {
+struct SectionHeader {
 	uint32 offset;
 	uint32 size;
-} SectionHeader;
+};
 
-struct {
+struct NsoHeader {
 	char   magic[0x4];
 	uint32 version;
 	uint32 reserved_1;
@@ -45,24 +46,24 @@ struct {
 	ubyte  data_hash[0x20];
 } nso_header;
 
-typedef struct {
+struct ModuleName {
 	ubyte name_length;
 	char  name[name_length];
-} ModuleName;
+};
 
-typedef struct {
+struct RoCrt {
 	uint32 entry_point;
 	uint32 mod_offset;
-} RoCrt;
+};
 
-typedef struct {
+struct ModStart {
 	RoCrt ro_crt;
 	if (ReadString(FTell(), 0x8) == "HOMEBREW") {
 		char reserved_1[0x8];
 	}
-} ModStart;
+};
 
-typedef struct {
+struct ModHeader {
 	char   magic[0x4];
 	uint32 dynamic_offset;
 	uint32 bss_start_offset;
@@ -70,22 +71,32 @@ typedef struct {
 	uint32 eh_frame_hdr_start_offset;
 	uint32 eh_frame_hdr_end_offset;
 	uint32 module_object_offset;
-} ModHeader;
+};
 
-typedef struct {
+struct LnyHeader {
 	char   magic[0x4];
 	uint32 got_start_offset;
 	uint32 got_end_offset;
-} LnyHeader;
+};
 
-struct {
+struct ModuleInfo {
+	uint32 name_length;
+	char   name[name_length];
+};
+
+uint32 AlignUp(uint32 offset, uint32 alignment) {
+	local uint32 mask = alignment - 1;
+	return (mask + offset) & ~mask;
+}
+
+struct NsoBody {
 	FSeek(nso_header.text_segment_header.file_offset);
 	ubyte text_segment[nso_header.text_file_size];
 	FSeek(nso_header.ro_segment_header.file_offset);
 	ubyte ro_segment[nso_header.ro_file_size];
 	FSeek(nso_header.data_segment_header.file_offset);
 	ubyte data_segment[nso_header.data_file_size];
-	if (nso_header.module_name_size != 0) {
+	if (nso_header.module_name_offset == 0x100 && nso_header.module_name_size != 0) {
 		FSeek(nso_header.module_name_offset);
 		ModuleName module_name;
 	}
@@ -93,9 +104,20 @@ struct {
 		FSeek(nso_header.text_segment_header.file_offset);
 		ModStart mod_start;
 		FSeek(nso_header.text_segment_header.file_offset + mod_start.ro_crt.mod_offset);
-		ModHeader mod_header;
-		if (exists(mod_start.reserved_1)) {
+		if ((nso_header.text_segment_header.file_offset + mod_start.ro_crt.mod_offset) < nso_header.ro_segment_header.file_offset) {
+			ModHeader mod_header;
+		}
+		if (ReadString(FTell(), 0x4) == "LNY0") {
 			LnyHeader lny_header;
+		}
+	}
+	if (!nso_header.flags.Flags_RoCompress) {
+		FSeek(nso_header.ro_segment_header.file_offset + 0x4);
+		ModuleInfo module_info;
+		if (!exists(mod_header)) {
+			/* If ModHeader is in RO, there is another ModStart struct at mod_offset - 0x8. */
+			FSeek(AlignUp(startof(module_info) + sizeof(module_info), 0x4) + 0x8);
+			ModHeader mod_header;
 		}
 		FSeek(nso_header.ro_segment_header.file_offset + nso_header.embedded_section_header.offset);
 		ubyte embedded_section[nso_header.embedded_section_header.size];
