@@ -1,9 +1,9 @@
 LittleEndian();
 DisplayFormatHex();
 
-local ubyte old_layout;
+local ubyte use_old_layout;
 
-struct {
+struct Package1LoaderHeader {
 	uint32 package1_loader_hash;
 	uint32 secure_monitor_hash;
 	uint32 nx_bootloader_hash;
@@ -12,29 +12,34 @@ struct {
 	uint16 version;
 } package1_loader_header;
 
+/* Does the size of package1_loader_section decrease for later package1's due to having multiple Package1LoaderHeader's? */
+struct Package1LoaderBody {
+	ubyte data[0x3FC0]; /* Size may be different for newer package1 - 0x6FC0? */
+} package1_loader_body;
+
 if (package1_loader_header.build_timestamp[0] == '2' && package1_loader_header.build_timestamp[1] == '0' && package1_loader_header.build_timestamp[2] == '1' && package1_loader_header.build_timestamp[3] == '6') {
-	old_layout = 1;
+	use_old_layout = 1;
 }
 
-FSeek(0x3FE0); /* Offset is different for newer package1 - 0x6FE0 */
-struct {
+FSeek(0x3FE0); /* Offset is different for newer package1 - 0x6FE0? */
+struct Package1Encryption {
 	uint32 size;
 	ubyte  reserved_1[0xC];
 	ubyte  ctr[0x10];
-} pk11_encryption;
+} package1_encryption;
 
-typedef struct {
+struct SectionHeader {
 	uint32 size;
 	uint32 offset;
-} SectionHeader;
+};
 
-struct {
+struct Package1Header {
 	char magic[0x4];
 	if (magic != "PK11") {
-		Warning("File is not decrypted.");
-		Exit(-1);
+		Warning("File is not decrypted or is not a valid file.");
+		Exit(0);
 	}
-	if (old_layout) {
+	if (use_old_layout) {
 		SectionHeader secure_monitor_section_header;
 		uint32 reserved_1;
 		SectionHeader nx_bootloader_section_header;
@@ -45,16 +50,16 @@ struct {
 		SectionHeader nx_bootloader_section_header;
 		SectionHeader secure_monitor_section_header;
 	}
-} pk11_header;
+} package1_header;
 
-struct {
-	if (old_layout) {
-		ubyte secure_montior[pk11_header.secure_monitor_section_header.size];
-		ubyte nx_bootloader[pk11_header.nx_bootloader_section_header.size];
-		ubyte warmboot[pk11_header.warmboot_section_header.size];
+struct Package1Body {
+	if (use_old_layout) {
+		ubyte secure_monitor_section[package1_header.secure_monitor_section_header.size];
+		ubyte nx_bootloader_section[package1_header.nx_bootloader_section_header.size];
+		ubyte warmboot_section[package1_header.warmboot_section_header.size];
 	} else {
-		ubyte warmboot[pk11_header.warmboot_section_header.size];
-		ubyte nx_bootloader[pk11_header.nx_bootloader_section_header.size];
-		ubyte secure_montior[pk11_header.secure_monitor_section_header.size];
+		ubyte warmboot_section[package1_header.warmboot_section_header.size];
+		ubyte nx_bootloader_section[package1_header.nx_bootloader_section_header.size];
+		ubyte secure_monitor_section[package1_header.secure_monitor_section_header.size];
 	}
-} pk11_body;
+} package1_body;
