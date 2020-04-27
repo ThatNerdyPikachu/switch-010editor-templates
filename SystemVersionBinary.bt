@@ -1,0 +1,13 @@
+struct SystemVersionBinary {
+	ubyte  major;
+	ubyte  minor;
+	ubyte  micro;
+	ubyte  reserved_1;
+	ubyte  major_relstep;
+	ubyte  minor_relstep;
+	uint16 reserved_2;
+	char   platform[0x20];
+	char   version_hash[0x40];
+	char   display_version[0x18];
+	char   display_title[0x80];
+} system_version_binary;
