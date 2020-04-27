@@ -4,82 +4,114 @@ DisplayFormatHex();
 local uint32 i, j, rom_file_entry_count;
 local uint64 fs_offset;
 
-typedef enum <ubyte> {
+enum <ubyte> DistributionType {
 	DistributionType_Download = 0,
 	DistributionType_GameCard = 1
-} DistributionType;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> ContentType {
 	ContentType_Program    = 0,
 	ContentType_Meta       = 1,
 	ContentType_Control    = 2,
 	ContentType_Manual     = 3,
 	ContentType_Data       = 4,
 	ContentType_PublicData = 5
-} ContentType;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> KeyAreaEncryptionKeyIndex {
 	KeyAreaEncryptionKeyIndex_Application = 0,
 	KeyAreaEncryptionKeyIndex_Ocean       = 1,
 	KeyAreaEncryptionKeyIndex_System      = 2
-} KeyAreaEncryptionKeyIndex;
+};
 
-typedef struct {
+struct SdkAddonVersion {
+	uint32 SdkAddonVersion_Relstep : 8;
+	uint32 SdkAddonVersion_Micro   : 8;
+	uint32 SdkAddonVersion_Minor   : 8;
+	uint32 SdkAddonVersion_Major   : 8;
+};
+
+struct FsEntry {
 	uint32 start_block_offset; /* start_block_offset * 0x200, start_offset >> 9 */
 	uint32 end_block_offset; /* end_block_offset * 0x200, end_offset >> 9 */
 	ubyte  enable_entry;
 	ubyte  reserved_1[0x7];
-} FsEntry;
+};
 
-typedef struct {
+struct FsHash {
 	ubyte hash[0x20];
-} FsHash;
+};
 
-typedef struct {
+struct EncryptedKey {
 	ubyte key[0x10];
-} EncryptedKey;
+};
 
-typedef enum <ubyte> {
+struct NcaHeader {
+	ubyte  main_signature[0x100];
+	ubyte  acid_signature[0x100];
+	char   magic[0x4];
+	if (magic != "NCA0" && magic != "NCA2" && magic != "NCA3") {
+		Warning("File is not decrypted or is not a valid file.");
+		Exit(0);
+	}
+	DistributionType distribution_type;
+	ContentType content_type;
+	ubyte  key_generation_old; /* 0=1.0.0-2.3.0, 1=Unused, 2=3.0.0 */
+	KeyAreaEncryptionKeyIndex key_area_encryption_key_index;
+	uint64 content_size;
+	uint64 program_id;
+	uint32 content_index;
+	SdkAddonVersion sdk_addon_version;
+	ubyte  key_generation; /* 3=3.0.1-3.0.2, 4=4.0.0-4.1.0, 5=5.0.0-5.1.0, 6=6.0.0-6.1.0, 7=6.2.0, 8=7.0.0-8.0.1, 9=8.1.0-8.1.1, 10=9.0.0-9.0.1, 11=9.1.0-9.2.0 */
+	ubyte  signature_key_generation; /* main_signature */
+	ubyte  reserved_1[0xE];
+	ubyte  rights_id[0x10];
+	FsEntry fs_entries[4];
+	FsHash fs_hashes[4];
+	EncryptedKey encrypted_keys[16];
+} nca_header;
+
+enum <ubyte> FsType {
 	FsType_RomFs       = 0,
 	FsType_PartitionFs = 1
-} FsType;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> HashType {
 	HashType_Auto                  = 0,
 	HashType_None                  = 1,
 	HashType_HierarchicalSha256    = 2,
 	HashType_HierarchicalIntegrity = 3
-} HashType;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> EncryptionType {
 	EncryptionType_Auto     = 0,
 	EncryptionType_None     = 1,
 	EncryptionType_AesXts   = 2,
 	EncryptionType_AesCtr   = 3,
 	EncryptionType_AesCtrEx = 4
-} EncryptionType;
+};
 
-typedef struct {
+struct HierarchicalSha256LayerInfo {
 	uint64 offset;
 	uint64 size;
-} HierarchicalSha256LayerInfo;
+};
 
-typedef struct {
+struct HierarchicalSha256Data {
 	ubyte  master_hash[0x20];
 	uint32 hash_block_size;
 	uint32 layer_count;
 	HierarchicalSha256LayerInfo hash_data_layer_info;
 	HierarchicalSha256LayerInfo hash_target_layer_info;
-} HierarchicalSha256Data; /* Used for PartitionFs and NCA0 RomFs */
+}; /* Used for PartitionFs and NCA0 RomFs. */
 
-typedef struct {
+struct IntegrityLayerInfo {
 	uint64 offset;
 	uint64 size;
 	uint32 block_size; /* 1 << block_size, log2(hash_block_size) */
 	uint32 reserved_1;
-} IntegrityLayerInfo;
+};
 
-typedef struct {
+struct IntegrityMetaInfo {
 	char   magic[0x4];
 	uint32 version;
 	uint32 master_hash_size;
@@ -88,9 +120,9 @@ typedef struct {
 	IntegrityLayerInfo hash_target_layer_info;
 	ubyte  signature_salt[0x20];
 	ubyte  master_hash[master_hash_size];
-} IntegrityMetaInfo;
+};
 
-typedef struct {
+struct HashData {
 	if (hash_type == HashType_HierarchicalSha256) {
 		HierarchicalSha256Data hierarchical_sha256_data;
 		ubyte reserved_1[0xB0];
@@ -100,16 +132,16 @@ typedef struct {
 	} else {
 		ubyte reserved_1[0xF8];
 	}
-} HashData;
+};
 
-typedef struct {
+struct BucketTreeHeader {
 	char   magic[0x4];
 	uint32 bucket_count;
 	uint32 entry_count;
 	uint32 reserved_1;
-} BucketTreeHeader;
+};
 
-typedef struct {
+struct PatchInfo {
 	if (encryption_type == EncryptionType_AesCtrEx) {
 		uint64 indirect_offset;
 		uint64 indirect_size;
@@ -120,13 +152,13 @@ typedef struct {
 	} else {
 		ubyte  reserved_1[0x40];
 	}
-} PatchInfo;
+};
 
-typedef struct {
+struct SparseInfo {
 	ubyte unknown_1[0x30]; /* Format unknown - If files are seen with this data, create an issue - actual size 0x28? */
-} SparseInfo;
+};
 
-typedef struct {
+struct NcaFsHeader {
 	uint16 version;
 	FsType fs_type;
 	HashType hash_type;
@@ -138,35 +170,9 @@ typedef struct {
 	uint32 secure_value; /* Program = 1 (nca_fs_headers[0]), 2 (nca_fs_headers[1]) - Manual = 4 (HtmlDocument), 5 (LegalInformation) */
 	SparseInfo sparse_info;
 	ubyte  reserved_2[0x88];
-} NcaFsHeader;
+};
 
-struct {
-	ubyte  main_signature[0x100];
-	ubyte  acid_signature[0x100];
-	char   magic[0x4];
-	if (magic != "NCA0" && magic != "NCA2" && magic != "NCA3") {
-		Warning("File is not decrypted or is not a valid NCA file.");
-		Exit(0);
-	}
-	DistributionType distribution_type;
-	ContentType content_type;
-	ubyte  key_generation_old; /* 0=1.0.0-2.3.0, 1=Unused, 2=3.0.0 */
-	KeyAreaEncryptionKeyIndex key_area_encryption_key_index;
-	uint64 content_size;
-	uint64 program_id;
-	uint32 content_index;
-	uint32 sdk_addon_version;
-	ubyte  key_generation; /* 3=3.0.1-3.0.2, 4=4.0.0-4.1.0, 5=5.0.0-5.1.0, 6=6.0.0-6.1.0, 7=6.2.0, 8=7.0.0-8.0.1, 9=8.1.0-8.1.1, 10=9.0.0-9.0.1, 11=9.1.0-9.2.0 */
-	ubyte  signature_key_generation; /* main_signature */
-	ubyte  reserved_1[0xE];
-	ubyte  rights_id[0x10];
-	FsEntry fs_entries[4];
-	FsHash fs_hashes[4];
-	EncryptedKey encrypted_keys[16];
-	NcaFsHeader nca_fs_headers[4] <optimize=false>;
-} nca_header;
-
-typedef struct {
+struct RomFileSystemInformationOld {
 	uint32 header_size;
 	uint32 directory_bucket_offset;
 	uint32 directory_bucket_size;
@@ -177,9 +183,9 @@ typedef struct {
 	uint32 file_entry_offset;
 	uint32 file_entry_size;
 	uint32 body_offset;
-} RomFileSystemInformationOld;
+};
 
-typedef struct {
+struct RomFileSystemInformation {
 	uint64 header_size;
 	uint64 directory_bucket_offset;
 	uint64 directory_bucket_size;
@@ -190,9 +196,9 @@ typedef struct {
 	uint64 file_entry_offset;
 	uint64 file_entry_size;
 	uint64 body_offset;
-} RomFileSystemInformation;
+};
 
-typedef struct {
+struct RomDirectoryEntry {
 	uint32 parent_offset;
 	uint32 next_offset;
 	uint32 directory_offset;
@@ -201,9 +207,9 @@ typedef struct {
 	uint32 name_length;
 	char   name[name_length];
 	ubyte  reserved_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
-} RomDirectoryEntry;
+};
 
-typedef struct {
+struct RomFileEntry {
 	uint32 parent_offset;
 	uint32 next_offset;
 	uint64 offset;
@@ -212,120 +218,134 @@ typedef struct {
 	uint32 name_length;
 	char   name[name_length];
 	ubyte  reserved_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
-} RomFileEntry;
+};
 
-typedef struct {
+struct RomFileData {
 	ubyte data[rom_file_entry[j].size];
-} RomFileData;
+};
 
-typedef struct {
+struct RomFileSystem {
+	if (nca_header. magic == "NCA0") {
+		RomFileSystemInformationOld rom_file_system_information;
+	} else {
+		RomFileSystemInformation rom_file_system_information;
+	}
+	FSeek(fs_offset + rom_file_system_information.directory_bucket_offset);
+	uint32 rom_directory_buckets[rom_file_system_information.directory_bucket_size >> 2];
+	FSeek(fs_offset + rom_file_system_information.directory_entry_offset);
+	while (FTell() < (fs_offset + rom_file_system_information.directory_entry_offset + rom_file_system_information.directory_entry_size)) {
+		RomDirectoryEntry rom_directory_entry;
+	}
+	FSeek(fs_offset + rom_file_system_information.file_bucket_offset);
+	uint32 rom_file_buckets[rom_file_system_information.file_bucket_size >> 2];
+	FSeek(fs_offset + rom_file_system_information.file_entry_offset);
+	while (FTell() < (fs_offset + rom_file_system_information.file_entry_offset + rom_file_system_information.file_entry_size)) {
+		RomFileEntry rom_file_entry;
+		rom_file_entry_count++;
+	}
+	for (j = 0; j < rom_file_entry_count; j++) {
+		FSeek(fs_offset + rom_file_system_information.body_offset + rom_file_entry[j].offset);
+		RomFileData rom_file_data;
+	}
+};
+
+struct PartitionEntry {
 	uint64 offset;
 	uint64 size;
 	uint32 name_offset;
 	uint32 reserved_1;
-} PartitionEntry;
+};
 
-typedef struct {
+struct PartitionFileSystemHeader {
 	char   magic[0x4];
 	uint32 entry_count;
 	uint32 name_table_size;
 	uint32 reserved_1;
 	PartitionEntry partition_entries[entry_count];
 	char   name_table[name_table_size];
-} PartitionFileSystemHeader;
+};
 
-typedef struct {
+struct PartitionFileData {
 	ubyte data[partition_file_system_header.partition_entries[j].size];
-} PartitionFileData;
+};
 
-typedef enum <uint32> {
+struct PartitionFileSystem {
+	PartitionFileSystemHeader partition_file_system_header;
+	for (j = 0; j < partition_file_system_header.entry_count; j++) {
+		FSeek(fs_offset + sizeof(partition_file_system_header) + partition_file_system_header.partition_entries[j].offset);
+		PartitionFileData partition_file_data;
+	}
+};
+
+enum <uint32> IndirectStorageIndex {
 	IndirectStorageIndex_Original = 0,
 	IndirectStorageIndex_Patch    = 1
-} IndirectStorageIndex;
+};
 
-typedef struct {
+struct IndirectStorageEntry {
 	uint64 virtual_offset;
 	uint64 physical_offset;
 	IndirectStorageIndex indirect_storage_index;
-} IndirectStorageEntry;
+};
 
-typedef struct {
+struct IndirectStorageBucket {
 	uint32 index;
 	uint32 entry_count;
 	uint64 end_offset;
-	IndirectStorageEntry indirect_storage_entries[0x3FF0 / 0x14];
-	ubyte  reserved_1[0x3FF0 % 0x14];
-} IndirectStorageBucket;
+	IndirectStorageEntry indirect_storage_entries[818];
+	ubyte  reserved_1[0x8];
+};
 
-typedef struct {
+struct IndirectStorageBlock {
 	uint32 index;
 	uint32 bucket_count;
 	uint64 virtual_size;
-	uint64 virtual_offsets[0x3FF0 / 0x8];
+	uint64 virtual_offsets[2046];
 	IndirectStorageBucket indirect_storage_buckets[bucket_count];
-} IndirectStorageBlock;
+};
 
-typedef struct {
+struct AesCtrExStorageEntry {
 	uint64 offset;
 	uint32 size;
 	uint32 generation;
-} AesCtrExStorageEntry;
+};
 
-typedef struct {
+struct AesCtrExStorageBucket {
 	uint32 index;
 	uint32 entry_count;
 	uint64 end_offset;
-	AesCtrExStorageEntry aes_ctr_ex_storage_entries[0x3FF];
-} AesCtrExStorageBucket;
+	AesCtrExStorageEntry aes_ctr_ex_storage_entries[1023];
+};
 
-typedef struct {
+struct AesCtrExStorageBlock {
 	uint32 index;
 	uint32 bucket_count;
 	uint64 physical_size;
-	uint64 physical_offsets[0x3FF0 / 0x8];
+	uint64 physical_offsets[2046];
 	AesCtrExStorageBucket aes_ctr_ex_storage_buckets[bucket_count];
-} AesCtrExStorageBlock;
+};
+
+if (nca_header.magic == "NCA2" || nca_header.magic == "NCA3") {
+	NcaFsHeader nca_fs_headers[4] <optimize=false>;
+}
 
 for (i = 0; i < 4; i++) {
+	if (nca_header.magic == "NCA0") {
+		FSeek(nca_header.fs_entries[i].start_block_offset * 0x200);
+		NcaFsHeader nca_fs_headers;
+	}
 	if (nca_header.fs_entries[i].enable_entry) {
-		if (nca_header.nca_fs_headers[i].fs_type == FsType_RomFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
-			if (nca_header.magic == "NCA0") {
-				fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_data.hierarchical_sha256_data.hash_target_layer_info.offset;
-				FSeek(fs_offset);
-				RomFileSystemInformationOld rom_file_system_information;
-			} else {
-				fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_data.integrity_meta_info.hash_target_layer_info.offset;
-				FSeek(fs_offset);
-				RomFileSystemInformation rom_file_system_information;
-			}
-			FSeek(fs_offset + rom_file_system_information.directory_bucket_offset);
-			uint32 rom_directory_buckets[rom_file_system_information.directory_bucket_size / 0x4];
-			FSeek(fs_offset + rom_file_system_information.directory_entry_offset);
-			while (FTell() < (fs_offset + rom_file_system_information.directory_entry_offset + rom_file_system_information.directory_entry_size)) {
-				RomDirectoryEntry rom_directory_entry;
-			}
-			FSeek(fs_offset + rom_file_system_information.file_bucket_offset);
-			uint32 rom_file_buckets[rom_file_system_information.file_bucket_size / 0x4];
-			FSeek(fs_offset + rom_file_system_information.file_entry_offset);
-			while (FTell() < (fs_offset + rom_file_system_information.file_entry_offset + rom_file_system_information.file_entry_size)) {
-				RomFileEntry rom_file_entry;
-				rom_file_entry_count++;
-			}
-			for (j = 0; j < rom_file_entry_count; j++) {
-				FSeek(fs_offset + rom_file_system_information.body_offset + rom_file_entry[j].offset);
-				RomFileData rom_file_data;
-			}
-		} else if (nca_header.nca_fs_headers[i].fs_type == FsType_PartitionFs && nca_header.nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
-			fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].hash_data.hierarchical_sha256_data.hash_target_layer_info.offset;
+		if (nca_fs_headers[i].fs_type == FsType_RomFs && nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
+			(nca_header.magic == "NCA0") ? fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_fs_headers[i].hash_data.hierarchical_sha256_data.hash_target_layer_info.offset : fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_fs_headers[i].hash_data.integrity_meta_info.hash_target_layer_info.offset;
 			FSeek(fs_offset);
-			PartitionFileSystemHeader partition_file_system_header;
-			for (j = 0; j < partition_file_system_header.entry_count; j++) {
-				FSeek(fs_offset + sizeof(partition_file_system_header) + partition_file_system_header.partition_entries[j].offset);
-				PartitionFileData partition_file_data;
-			}
-		} else if (nca_header.nca_fs_headers[i].encryption_type == EncryptionType_AesCtrEx) {
-			FSeek((nca_header.fs_entries[i].start_block_offset * 0x200) + nca_header.nca_fs_headers[i].patch_info.indirect_offset);
-			if (ReadUInt() != 0) break; /* Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong - use hactoolnet instead */
+			RomFileSystem rom_file_system;
+		} else if (nca_fs_headers[i].fs_type == FsType_PartitionFs && nca_fs_headers[i].encryption_type != EncryptionType_AesCtrEx) {
+			fs_offset = (nca_header.fs_entries[i].start_block_offset * 0x200) + nca_fs_headers[i].hash_data.hierarchical_sha256_data.hash_target_layer_info.offset;
+			FSeek(fs_offset);
+			PartitionFileSystem partition_file_system;
+		} else if (nca_fs_headers[i].encryption_type == EncryptionType_AesCtrEx) {
+			FSeek((nca_header.fs_entries[i].start_block_offset * 0x200) + nca_fs_headers[i].patch_info.indirect_offset);
+			if (ReadUInt() != 0) break; /* Hactool incorrectly decrypts these sections when saving as plaintext, so abort if the data is wrong - use hactoolnet instead. */
 			IndirectStorageBlock indirect_storage_block;
 			AesCtrExStorageBlock aes_ctr_ex_storage_block;
 			/* TODO: Patch RomFs */
