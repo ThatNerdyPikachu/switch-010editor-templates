@@ -1,28 +1,53 @@
 LittleEndian();
 DisplayFormatHex();
+/* BitfieldDisablePadding(); */
 
-local uint32 offset, target, i, j, descriptor_start, descriptor_count, descriptor, entry_number, index;
-local ubyte  page;
+local uint32 offset, i, descriptor_start, descriptor_count, descriptor, index;
+local ubyte  current_page;
 
-typedef enum <ubyte> {
+enum <uint32> EntryNumber {
+	EntryNumber_ThreadInfo        = 3,
+	EntryNumber_EnableSystemCalls = 4,
+	EntryNumber_MemoryMap         = 6,
+	EntryNumber_IoMemoryMap       = 7,
+	EntryNumber_MemoryRegionMap   = 10,
+	EntryNumber_EnableInterrupts  = 11,
+	EntryNumber_MiscParams        = 13,
+	EntryNumber_KernelVersion     = 14,
+	EntryNumber_HandleTableSize   = 15,
+	EntryNumber_MiscFlags         = 16
+};
+
+local EntryNumber entry_number;
+
+enum <ubyte> ProcessAddressSpace {
 	ProcessAddressSpace_AddressSpace32Bit           = 0,
 	ProcessAddressSpace_AddressSpace64BitOld        = 1,
 	ProcessAddressSpace_AddressSpace32BitNoReserved = 2,
 	ProcessAddressSpace_AddressSpace64Bit           = 3
-} ProcessAddressSpace;
+};
 
-typedef struct {
-	ubyte MetaFlags_Is64BitInstruction                : 1;
+struct MetaFlags {
+	ubyte MetaFlags_Is64BitInstruction       : 1;
 	ProcessAddressSpace MetaFlags_ProcessAddressSpace : 3;
-	ubyte MetaFlags_OptimizeMemoryAllocation          : 1;
-} MetaFlags;
+	ubyte MetaFlags_OptimizeMemoryAllocation : 1;
+	ubyte MetaFlags_Reserved1                : 3;
+};
 
-typedef struct {
+struct Version {
+	uint32 Version_MinorRelstep : 8;
+	uint32 Version_MajorRelstep : 8;
+	uint32 Version_Micro        : 4;
+	uint32 Version_Minor        : 6;
+	uint32 Version_Major        : 6;
+};
+
+struct SectionHeader {
 	uint32 offset;
 	uint32 size;
-} SectionHeader;
+};
 
-struct {
+struct MetaHeader {
 	char   magic[0x4];
 	ubyte  signature_key_generation; /* acid_header.signature */
 	ubyte  reserved_1[0x7];
@@ -32,29 +57,30 @@ struct {
 	ubyte  main_thread_core_number;
 	uint32 reserved_3;
 	uint32 system_resource_size;
-	uint32 version;
+	Version version;
 	uint32 main_thread_stack_size;
 	char   name[0x10];
 	char   product_code[0x10];
 	ubyte  reserved_4[0x30];
-	SectionHeader aci;
-	SectionHeader acid;
+	SectionHeader aci_section_header;
+	SectionHeader acid_section_header;
 } meta_header;
 
-typedef enum <uint32> {
+enum <uint32> MemoryRegion {
 	MemoryRegion_Application     = 0,
 	MemoryRegion_Applet          = 1,
 	MemoryRegion_SecureSystem    = 2,
 	MemoryRegion_NonSecureSystem = 3
-} MemoryRegion;
+};
 
-typedef struct {
+struct AcidFlags {
 	uint32 AcidFlags_Production          : 1;
 	uint32 AcidFlags_UnqualifiedApproval : 1;
 	MemoryRegion AcidFlags_MemoryRegion  : 2;
-} AcidFlags;
+	uint32 AcidFlags_Reserved1           : 28;
+};
 
-typedef struct {
+struct FlagPresetsBit {
 	uint64 FlagPresetsBit_ApplicationInfo             : 1;
 	uint64 FlagPresetsBit_BootModeControl             : 1;
 	uint64 FlagPresetsBit_Calibration                 : 1;
@@ -91,12 +117,13 @@ typedef struct {
 	uint64 FlagPresetsBit_SaveDataTransferVersion2    : 1;
 	uint64 FlagPresetsBit_RegisterProgramIndexMapInfo : 1;
 	uint64 FlagPresetsBit_CreateOwnSaveData           : 1;
-	uint64 FlagPresetsBit_Reserved1                   : 22;
+	uint64 FlagPresetsBit_Unknown1                    : 1;  /* Name unknown. */
+	uint64 FlagPresetsBit_Reserved1                   : 25;
 	uint64 FlagPresetsBit_Debug                       : 1;
 	uint64 FlagPresetsBit_FullPermission              : 1;
-} FlagPresetsBit;
+};
 
-typedef struct {
+struct FacDescriptor {
 	ubyte  version;
 	ubyte  content_owner_id_count;
 	ubyte  save_data_owner_id_count;
@@ -108,317 +135,330 @@ typedef struct {
 	uint64 save_data_owner_id_max;
 	uint64 content_owner_ids[content_owner_id_count];
 	uint64 save_data_owner_ids[save_data_owner_id_count];
-} FacDescriptor;
+};
 
-typedef struct {
+struct Descriptor {
 	ubyte Descriptor_NameLength : 3;
 	ubyte Descriptor_Reserved1  : 4;
 	ubyte Descriptor_IsServer   : 1;
-} Descriptor;
+};
 
-typedef struct {
+struct SacEntry {
 	Descriptor descriptor;
 	char name[descriptor.Descriptor_NameLength + 1];
-} SacEntry;
+};
 
-typedef struct {
-	while (FTell() < offset + sac.offset + sac.size) {
+struct SacData {
+	while (FTell() < (offset + sac_section_header.offset + sac_section_header.size)) {
 		SacEntry sac_entry;
 	}
-} SacData;
+};
 
-typedef struct {
-	uint32 ThreadInfo_EntryNumber     : 3;
-	uint32 ThreadInfo_Reserved1       : 1;
-	uint32 ThreadInfo_LowestPriority  : 6;
-	uint32 ThreadInfo_HighestPriority : 6;
-	uint32 ThreadInfo_MinCoreNumber   : 8;
-	uint32 ThreadInfo_MaxCoreNumber   : 8;
-} ThreadInfo;
+struct ThreadInfo {
+	uint32 entry_number     : 3;
+	uint32 reserved_1       : 1;
+	uint32 lowest_priority  : 6;
+	uint32 highest_priority : 6;
+	uint32 min_core_number  : 8;
+	uint32 max_core_number  : 8;
+};
 
-void GetSystemCallId(uint32 id) {
-	switch (id) {
-		case 0:   uint32 SystemCallId_Unknown0                       : 1; break;
-		case 1:   uint32 SystemCallId_SetHeapSize                    : 1; break;
-		case 2:	  uint32 SystemCallId_SetMemoryPermission            : 1; break;
-		case 3:   uint32 SystemCallId_SetMemoryAttribute             : 1; break;
-		case 4:   uint32 SystemCallId_MapMemory                      : 1; break;
-		case 5:   uint32 SystemCallId_UnmapMemory                    : 1; break;
-		case 6:   uint32 SystemCallId_QueryMemory                    : 1; break;
-		case 7:   uint32 SystemCallId_ExitProcess                    : 1; break;
-		case 8:   uint32 SystemCallId_CreateThread                   : 1; break;
-		case 9:   uint32 SystemCallId_StartThread                    : 1; break;
-		case 10:  uint32 SystemCallId_ExitThread                     : 1; break;
-		case 11:  uint32 SystemCallId_SleepThread                    : 1; break;
-		case 12:  uint32 SystemCallId_GetThreadPriority              : 1; break;
-		case 13:  uint32 SystemCallId_SetThreadPriority              : 1; break;
-		case 14:  uint32 SystemCallId_GetThreadCoreMask              : 1; break;
-		case 15:  uint32 SystemCallId_SetThreadCoreMask              : 1; break;
-		case 16:  uint32 SystemCallId_GetCurrentProcessorNumber      : 1; break;
-		case 17:  uint32 SystemCallId_SignalEvent                    : 1; break;
-		case 18:  uint32 SystemCallId_ClearEvent                     : 1; break;
-		case 19:  uint32 SystemCallId_MapSharedMemory                : 1; break;
-		case 20:  uint32 SystemCallId_UnmapSharedMemory              : 1; break;
-		case 21:  uint32 SystemCallId_CreateTransferMemory           : 1; break;
-		case 22:  uint32 SystemCallId_CloseHandle                    : 1; break;
-		case 23:  uint32 SystemCallId_ResetSignal                    : 1; break;
-		case 24:  uint32 SystemCallId_WaitSynchronization            : 1; break;
-		case 25:  uint32 SystemCallId_CancelSynchronization          : 1; break;
-		case 26:  uint32 SystemCallId_ArbitrateLock                  : 1; break;
-		case 27:  uint32 SystemCallId_ArbitrateUnlock                : 1; break;
-		case 28:  uint32 SystemCallId_WaitProcessWideKeyAtomic       : 1; break;
-		case 29:  uint32 SystemCallId_SignalProcessWideKey           : 1; break;
-		case 30:  uint32 SystemCallId_GetSystemTick                  : 1; break;
-		case 31:  uint32 SystemCallId_ConnectToNamedPort             : 1; break;
-		case 32:  uint32 SystemCallId_SendSyncRequestLight           : 1; break;
-		case 33:  uint32 SystemCallId_SendSyncRequest                : 1; break;
-		case 34:  uint32 SystemCallId_SendSyncRequestWithUserBuffer  : 1; break;
-		case 35:  uint32 SystemCallId_SendAsyncRequestWithUserBuffer : 1; break;
-		case 36:  uint32 SystemCallId_GetProcessId                   : 1; break;
-		case 37:  uint32 SystemCallId_GetThreadId                    : 1; break;
-		case 38:  uint32 SystemCallId_Break                          : 1; break;
-		case 39:  uint32 SystemCallId_OutputDebugString              : 1; break;
-		case 40:  uint32 SystemCallId_ReturnFromException            : 1; break;
-		case 41:  uint32 SystemCallId_GetInfo                        : 1; break;
-		case 42:  uint32 SystemCallId_FlushEntireDataCache           : 1; break;
-		case 43:  uint32 SystemCallId_FlushDataCache                 : 1; break;
-		case 44:  uint32 SystemCallId_MapPhysicalMemory              : 1; break;
-		case 45:  uint32 SystemCallId_UnmapPhysicalMemory            : 1; break;
-		case 46:  uint32 SystemCallId_GetDebugFutureThreadInfo       : 1; break;
-		case 47:  uint32 SystemCallId_GetLastThreadInfo              : 1; break;
-		case 48:  uint32 SystemCallId_GetResourceLimitLimitValue     : 1; break;
-		case 49:  uint32 SystemCallId_GetResourceLimitCurrentValue   : 1; break;
-		case 50:  uint32 SystemCallId_SetThreadActivity              : 1; break;
-		case 51:  uint32 SystemCallId_GetThreadContext3              : 1; break;
-		case 52:  uint32 SystemCallId_WaitForAddress                 : 1; break;
-		case 53:  uint32 SystemCallId_SignalToAddress                : 1; break;
-		case 54:  uint32 SystemCallId_SynchronizePreemptionState     : 1; break;
-		case 55:  uint32 SystemCallId_Unknown55                      : 1; break;
-		case 56:  uint32 SystemCallId_Unknown56                      : 1; break;
-		case 57:  uint32 SystemCallId_Unknown57                      : 1; break;
-		case 58:  uint32 SystemCallId_Unknown58                      : 1; break;
-		case 59:  uint32 SystemCallId_Unknown59                      : 1; break;
-		case 60:  uint32 SystemCallId_KernelDebug                    : 1; break;
-		case 61:  uint32 SystemCallId_ChangeKernelTraceState         : 1; break;
-		case 62:  uint32 SystemCallId_Unknown62                      : 1; break;
-		case 63:  uint32 SystemCallId_Unknown63                      : 1; break;
-		case 64:  uint32 SystemCallId_CreateSession                  : 1; break;
-		case 65:  uint32 SystemCallId_AcceptSession                  : 1; break;
-		case 66:  uint32 SystemCallId_ReplyAndReceiveLight           : 1; break;
-		case 67:  uint32 SystemCallId_ReplyAndReceive                : 1; break;
-		case 68:  uint32 SystemCallId_ReplyAndReceiveWithUserBuffer  : 1; break;
-		case 69:  uint32 SystemCallId_CreateEvent                    : 1; break;
-		case 70:  uint32 SystemCallId_Unknown70                      : 1; break;
-		case 71:  uint32 SystemCallId_Unknown71                      : 1; break;
-		case 72:  uint32 SystemCallId_MapPhysicalMemoryUnsafe        : 1; break;
-		case 73:  uint32 SystemCallId_UnmapPhysicalMemoryUnsafe      : 1; break;
-		case 74:  uint32 SystemCallId_SetUnsafeLimit                 : 1; break;
-		case 75:  uint32 SystemCallId_CreateCodeMemory               : 1; break;
-		case 76:  uint32 SystemCallId_ControlCodeMemory              : 1; break;
-		case 77:  uint32 SystemCallId_SleepSystem                    : 1; break;
-		case 78:  uint32 SystemCallId_ReadWriteRegister              : 1; break;
-		case 79:  uint32 SystemCallId_SetProcessActivity             : 1; break;
-		case 80:  uint32 SystemCallId_CreateSharedMemory             : 1; break;
-		case 81:  uint32 SystemCallId_MapTransferMemory              : 1; break;
-		case 82:  uint32 SystemCallId_UnmapTransferMemory            : 1; break;
-		case 83:  uint32 SystemCallId_CreateInterruptEvent           : 1; break;
-		case 84:  uint32 SystemCallId_QueryPhysicalAddress           : 1; break;
-		case 85:  uint32 SystemCallId_QueryIoMapping                 : 1; break;
-		case 86:  uint32 SystemCallId_CreateDeviceAddressSpace       : 1; break;
-		case 87:  uint32 SystemCallId_AttachDeviceAddressSpace       : 1; break;
-		case 88:  uint32 SystemCallId_DetachDeviceAddressSpace       : 1; break;
-		case 89:  uint32 SystemCallId_MapDeviceAddressSpaceByForce   : 1; break;
-		case 90:  uint32 SystemCallId_MapDeviceAddressSpaceAligned   : 1; break;
-		case 91:  uint32 SystemCallId_MapDeviceAddressSpace          : 1; break;
-		case 92:  uint32 SystemCallId_UnmapDeviceAddressSpace        : 1; break;
-		case 93:  uint32 SystemCallId_InvalidateProcessDataCache     : 1; break;
-		case 94:  uint32 SystemCallId_StoreProcessDataCache          : 1; break;
-		case 95:  uint32 SystemCallId_FlushProcessDataCache          : 1; break;
-		case 96:  uint32 SystemCallId_DebugActiveProcess             : 1; break;
-		case 97:  uint32 SystemCallId_BreakDebugProcess              : 1; break;
-		case 98:  uint32 SystemCallId_TerminateDebugProcess          : 1; break;
-		case 99:  uint32 SystemCallId_GetDebugEvent                  : 1; break;
-		case 100: uint32 SystemCallId_ContinueDebugEvent             : 1; break;
-		case 101: uint32 SystemCallId_GetProcessList                 : 1; break;
-		case 102: uint32 SystemCallId_GetThreadList                  : 1; break;
-		case 103: uint32 SystemCallId_GetDebugThreadContext          : 1; break;
-		case 104: uint32 SystemCallId_SetDebugThreadContext          : 1; break;
-		case 105: uint32 SystemCallId_QueryDebugProcessMemory        : 1; break;
-		case 106: uint32 SystemCallId_ReadDebugProcessMemory         : 1; break;
-		case 107: uint32 SystemCallId_WriteDebugProcessMemory        : 1; break;
-		case 108: uint32 SystemCallId_SetHardwareBreakPoint          : 1; break;
-		case 109: uint32 SystemCallId_GetDebugThreadParam            : 1; break;
-		case 110: uint32 SystemCallId_Unknown110                     : 1; break;
-		case 111: uint32 SystemCallId_GetSystemInfo                  : 1; break;
-		case 112: uint32 SystemCallId_CreatePort                     : 1; break;
-		case 113: uint32 SystemCallId_ManageNamedPort                : 1; break;
-		case 114: uint32 SystemCallId_ConnectToPort                  : 1; break;
-		case 115: uint32 SystemCallId_SetProcessMemoryPermission     : 1; break;
-		case 116: uint32 SystemCallId_MapProcessMemory               : 1; break;
-		case 117: uint32 SystemCallId_UnmapProcessMemory             : 1; break;
-		case 118: uint32 SystemCallId_QueryProcessMemory             : 1; break;
-		case 119: uint32 SystemCallId_MapProcessCodeMemory           : 1; break;
-		case 120: uint32 SystemCallId_UnmapProcessCodeMemory         : 1; break;
-		case 121: uint32 SystemCallId_CreateProcess                  : 1; break;
-		case 122: uint32 SystemCallId_StartProcess                   : 1; break;
-		case 123: uint32 SystemCallId_TerminateProcess               : 1; break;
-		case 124: uint32 SystemCallId_GetProcessInfo                 : 1; break;
-		case 125: uint32 SystemCallId_CreateResourceLimit            : 1; break;
-		case 126: uint32 SystemCallId_SetResourceLimitLimitValue     : 1; break;
-		case 127: uint32 SystemCallId_CallSecureMonitor              : 1; break;
-		default:
-			uint32 SystemCallId_Reserved1                            : 16;
-			j = 24;
+struct SystemCallIds {
+	/* Workaround for BitfieldDisablePadding() bug. It's not pretty and causes the size in the variables tab to show 0. */
+	FSkip(-0x4);
+	uint32 : 5;
+	switch (index) {
+		case 0:
+			uint32 SystemCallId_Unknown1                       : 1;
+			uint32 SystemCallId_SetHeapSize                    : 1;
+			uint32 SystemCallId_SetMemoryPermission            : 1;
+			uint32 SystemCallId_SetMemoryAttribute             : 1;
+			uint32 SystemCallId_MapMemory                      : 1;
+			uint32 SystemCallId_UnmapMemory                    : 1;
+			uint32 SystemCallId_QueryMemory                    : 1;
+			uint32 SystemCallId_ExitProcess                    : 1;
+			uint32 SystemCallId_CreateThread                   : 1;
+			uint32 SystemCallId_StartThread                    : 1;
+			uint32 SystemCallId_ExitThread                     : 1;
+			uint32 SystemCallId_SleepThread                    : 1;
+			uint32 SystemCallId_GetThreadPriority              : 1;
+			uint32 SystemCallId_SetThreadPriority              : 1;
+			uint32 SystemCallId_GetThreadCoreMask              : 1;
+			uint32 SystemCallId_SetThreadCoreMask              : 1;
+			uint32 SystemCallId_GetCurrentProcessorNumber      : 1;
+			uint32 SystemCallId_SignalEvent                    : 1;
+			uint32 SystemCallId_ClearEvent                     : 1;
+			uint32 SystemCallId_MapSharedMemory                : 1;
+			uint32 SystemCallId_UnmapSharedMemory              : 1;
+			uint32 SystemCallId_CreateTransferMemory           : 1;
+			uint32 SystemCallId_CloseHandle                    : 1;
+			uint32 SystemCallId_ResetSignal                    : 1;
+			break;
+		case 1:
+			uint32 SystemCallId_WaitSynchronization            : 1;
+			uint32 SystemCallId_CancelSynchronization          : 1;
+			uint32 SystemCallId_ArbitrateLock                  : 1;
+			uint32 SystemCallId_ArbitrateUnlock                : 1;
+			uint32 SystemCallId_WaitProcessWideKeyAtomic       : 1;
+			uint32 SystemCallId_SignalProcessWideKey           : 1;
+			uint32 SystemCallId_GetSystemTick                  : 1;
+			uint32 SystemCallId_ConnectToNamedPort             : 1;
+			uint32 SystemCallId_SendSyncRequestLight           : 1;
+			uint32 SystemCallId_SendSyncRequest                : 1;
+			uint32 SystemCallId_SendSyncRequestWithUserBuffer  : 1;
+			uint32 SystemCallId_SendAsyncRequestWithUserBuffer : 1;
+			uint32 SystemCallId_GetProcessId                   : 1;
+			uint32 SystemCallId_GetThreadId                    : 1;
+			uint32 SystemCallId_Break                          : 1;
+			uint32 SystemCallId_OutputDebugString              : 1;
+			uint32 SystemCallId_ReturnFromException            : 1;
+			uint32 SystemCallId_GetInfo                        : 1;
+			uint32 SystemCallId_FlushEntireDataCache           : 1;
+			uint32 SystemCallId_FlushDataCache                 : 1;
+			uint32 SystemCallId_MapPhysicalMemory              : 1;
+			uint32 SystemCallId_UnmapPhysicalMemory            : 1;
+			uint32 SystemCallId_GetDebugFutureThreadInfo       : 1;
+			uint32 SystemCallId_GetLastThreadInfo              : 1;
+			break;
+		case 2:
+			uint32 SystemCallId_GetResourceLimitLimitValue     : 1;
+			uint32 SystemCallId_GetResourceLimitCurrentValue   : 1;
+			uint32 SystemCallId_SetThreadActivity              : 1;
+			uint32 SystemCallId_GetThreadContext3              : 1;
+			uint32 SystemCallId_WaitForAddress                 : 1;
+			uint32 SystemCallId_SignalToAddress                : 1;
+			uint32 SystemCallId_SynchronizePreemptionState     : 1;
+			uint32 SystemCallId_Unknown2                       : 1;
+			uint32 SystemCallId_Unknown3                       : 1;
+			uint32 SystemCallId_Unknown4                       : 1;
+			uint32 SystemCallId_Unknown5                       : 1;
+			uint32 SystemCallId_Unknown6                       : 1;
+			uint32 SystemCallId_KernelDebug                    : 1;
+			uint32 SystemCallId_ChangeKernelTraceState         : 1;
+			uint32 SystemCallId_Unknown7                       : 1;
+			uint32 SystemCallId_Unknown8                       : 1;
+			uint32 SystemCallId_CreateSession                  : 1;
+			uint32 SystemCallId_AcceptSession                  : 1;
+			uint32 SystemCallId_ReplyAndReceiveLight           : 1;
+			uint32 SystemCallId_ReplyAndReceive                : 1;
+			uint32 SystemCallId_ReplyAndReceiveWithUserBuffer  : 1;
+			uint32 SystemCallId_CreateEvent                    : 1;
+			uint32 SystemCallId_Unknown9                       : 1;
+			uint32 SystemCallId_Unknown10                      : 1;
+			break;
+		case 3:
+			uint32 SystemCallId_MapPhysicalMemoryUnsafe        : 1;
+			uint32 SystemCallId_UnmapPhysicalMemoryUnsafe      : 1;
+			uint32 SystemCallId_SetUnsafeLimit                 : 1;
+			uint32 SystemCallId_CreateCodeMemory               : 1;
+			uint32 SystemCallId_ControlCodeMemory              : 1;
+			uint32 SystemCallId_SleepSystem                    : 1;
+			uint32 SystemCallId_ReadWriteRegister              : 1;
+			uint32 SystemCallId_SetProcessActivity             : 1;
+			uint32 SystemCallId_CreateSharedMemory             : 1;
+			uint32 SystemCallId_MapTransferMemory              : 1;
+			uint32 SystemCallId_UnmapTransferMemory            : 1;
+			uint32 SystemCallId_CreateInterruptEvent           : 1;
+			uint32 SystemCallId_QueryPhysicalAddress           : 1;
+			uint32 SystemCallId_QueryIoMapping                 : 1;
+			uint32 SystemCallId_CreateDeviceAddressSpace       : 1;
+			uint32 SystemCallId_AttachDeviceAddressSpace       : 1;
+			uint32 SystemCallId_DetachDeviceAddressSpace       : 1;
+			uint32 SystemCallId_MapDeviceAddressSpaceByForce   : 1;
+			uint32 SystemCallId_MapDeviceAddressSpaceAligned   : 1;
+			uint32 SystemCallId_MapDeviceAddressSpace          : 1;
+			uint32 SystemCallId_UnmapDeviceAddressSpace        : 1;
+			uint32 SystemCallId_InvalidateProcessDataCache     : 1;
+			uint32 SystemCallId_StoreProcessDataCache          : 1;
+			uint32 SystemCallId_FlushProcessDataCache          : 1;
+			break;
+		case 4:
+			uint32 SystemCallId_DebugActiveProcess             : 1;
+			uint32 SystemCallId_BreakDebugProcess              : 1;
+			uint32 SystemCallId_TerminateDebugProcess          : 1;
+			uint32 SystemCallId_GetDebugEvent                  : 1;
+			uint32 SystemCallId_ContinueDebugEvent             : 1;
+			uint32 SystemCallId_GetProcessList                 : 1;
+			uint32 SystemCallId_GetThreadList                  : 1;
+			uint32 SystemCallId_GetDebugThreadContext          : 1;
+			uint32 SystemCallId_SetDebugThreadContext          : 1;
+			uint32 SystemCallId_QueryDebugProcessMemory        : 1;
+			uint32 SystemCallId_ReadDebugProcessMemory         : 1;
+			uint32 SystemCallId_WriteDebugProcessMemory        : 1;
+			uint32 SystemCallId_SetHardwareBreakPoint          : 1;
+			uint32 SystemCallId_GetDebugThreadParam            : 1;
+			uint32 SystemCallId_Unknown11                      : 1;
+			uint32 SystemCallId_GetSystemInfo                  : 1;
+			uint32 SystemCallId_CreatePort                     : 1;
+			uint32 SystemCallId_ManageNamedPort                : 1;
+			uint32 SystemCallId_ConnectToPort                  : 1;
+			uint32 SystemCallId_SetProcessMemoryPermission     : 1;
+			uint32 SystemCallId_MapProcessMemory               : 1;
+			uint32 SystemCallId_UnmapProcessMemory             : 1;
+			uint32 SystemCallId_QueryProcessMemory             : 1;
+			uint32 SystemCallId_MapProcessCodeMemory           : 1;
+			break;
+		case 5:
+			uint32 SystemCallId_UnmapProcessCodeMemory         : 1;
+			uint32 SystemCallId_CreateProcess                  : 1;
+			uint32 SystemCallId_StartProcess                   : 1;
+			uint32 SystemCallId_TerminateProcess               : 1;
+			uint32 SystemCallId_GetProcessInfo                 : 1;
+			uint32 SystemCallId_CreateResourceLimit            : 1;
+			uint32 SystemCallId_SetResourceLimitLimitValue     : 1;
+			uint32 SystemCallId_CallSecureMonitor              : 1;
+			uint32 SystemCallId_Reserved1                      : 16;
 			break;
 	}
-}
+};
 
-typedef struct {
-	uint32 EnableSystemCalls_EntryNumber : 4;
-	uint32 EnableSystemCalls_Reserved1   : 1;
-	for (j = 0; j < 24; j++) {
-		GetSystemCallId((index * 24) + j);
-	}
-	uint32 EnableSystemCalls_Index       : 3;
-} EnableSystemCalls;
+struct EnableSystemCalls {
+	uint32 entry_number : 4;
+	uint32 reserved_1   : 1;
+	SystemCallIds system_call_ids;
+	uint32 index        : 3;
+};
 
-typedef enum <uint32> {
+enum <uint32> PermissionType {
 	PermissionType_RW = 0,
 	PermissionType_RO = 1
-} PermissionType;
+};
 
-typedef enum <uint32> {
-	MappingType_Io     = 0,
-	MappingType_Static = 1
-} MappingType;
+enum <uint32> MapType {
+	MapType_Io     = 0,
+	MapType_Static = 1
+};
 
-typedef struct {
-	uint32 MemoryMap_EntryNumber : 6;
-	uint32 MemoryMap_Reserved1   : 1;
-	if (!page) {
-		uint32 MemoryMap_BeginAddress : 24; /* begin_address << 12 */
-		PermissionType MemoryMap_PermissionType : 1;
-		page = 1;
+struct MemoryMap {
+	uint32 entry_number : 6;
+	uint32 reserved_1   : 1;
+	if (!current_page) {
+		uint32 begin_address : 24; /* begin_address << 12 */
+		PermissionType permission_type : 1;
+		current_page = 1;
 	} else {
-		uint32 MemoryMap_Size         : 20; /* size << 12 */
-		uint32 MemoryMap_Reserved2    : 4;
-		MappingType MemoryMap_MappingType : 1;
-		page = 0;
+		uint32 size          : 20; /* size << 12 */
+		uint32 reserved_2    : 4;
+		MapType map_type     : 1;
+		current_page = 0;
 	}
-} MemoryMap;
+};
 
-typedef struct {
-	uint32 IoMemoryMap_EntryNumber  : 7;
-	uint32 IoMemoryMap_Reserved1    : 1;
-	uint32 IoMemoryMap_BeginAddress : 24; /* begin_address << 12 */
-} IoMemoryMap;
+struct IoMemoryMap {
+	uint32 entry_number  : 7;
+	uint32 reserved_1    : 1;
+	uint32 begin_address : 24; /* begin_address << 12 */
+};
 
-typedef enum <uint32> {
+enum <uint32> RegionType {
 	RegionType_NoMapping         = 0,
 	RegionType_KernelTraceBuffer = 1,
 	RegionType_OnMemoryBootImage = 2,
 	RegionType_DTB               = 3
-} RegionType;
+};
 
-typedef struct {
-	uint32 MemoryRegionMap_EntryNumber : 10;
-	uint32 MemoryRegionMap_Reserved1   : 1;
-	RegionType MemoryRegionMap_RegionType0 : 6;
-	PermissionType MemoryRegionMap_PermissionType0 : 1;
-	RegionType MemoryRegionMap_RegionType1 : 6;
-	PermissionType MemoryRegionMap_PermissionType1 : 1;
-	RegionType MemoryRegionMap_RegionType2 : 6;
-	PermissionType MemoryRegionMap_PermissionType2 : 1;
-} MemoryRegionMap;
+struct MemoryRegionMap {
+	uint32 entry_number : 10;
+	uint32 reserved_1   : 1;
+	RegionType region_type_1 : 6;
+	PermissionType permission_type_1 : 1;
+	RegionType region_type_2 : 6;
+	PermissionType permission_type_2 : 1;
+	RegionType region_type_3 : 6;
+	PermissionType permission_type_3 : 1;
+};
 
-typedef struct {
-	uint32 EnableInterrupts_EntryNumber      : 11;
-	uint32 EnableInterrupts_Reserved1        : 1;
-	uint32 EnableInterrupts_InterruptNumber0 : 10;
-	uint32 EnableInterrupts_InterruptNumber1 : 10;
-} EnableInterrupts;
+struct EnableInterrupts {
+	uint32 entry_number       : 11;
+	uint32 reserved_1         : 1;
+	uint32 interrupt_number_1 : 10;
+	uint32 interrupt_number_2 : 10;
+};
 
-typedef enum <uint32> {
+enum <uint32> ProgramType {
 	ProgramType_System      = 0,
 	ProgramType_Application = 1,
 	ProgramType_Applet      = 2
-} ProgramType;
+};
 
-typedef struct {
-	uint32 MiscParams_EntryNumber : 13;
-	uint32 MiscParams_Reserved1   : 1;
-	ProgramType MiscParams_ProgramType : 3;
-} MiscParams;
+struct MiscParams {
+	uint32 entry_number : 13;
+	uint32 reserved_1   : 1;
+	ProgramType program_type : 3;
+	uint32 reserved_2   : 15;
+};
 
-typedef struct {
-	uint32 KernelVersion_EntryNumber  : 14;
-	uint32 KernelVersion_Reserved1    : 1;
-	uint32 KernelVersion_MinorVersion : 4;
-	uint32 KernelVersion_MajorVersion : 13;
-} KernelVersion;
+struct KernelVersion {
+	uint32 entry_number  : 14;
+	uint32 reserved_1    : 1;
+	uint32 minor_version : 4;
+	uint32 major_version : 13;
+};
 
-typedef struct {
-	uint32 HandleTableSize_EntryNumber     : 15;
-	uint32 HandleTableSize_Reserved1       : 1;
-	uint32 HandleTableSize_HandleTableSize : 10;
-} HandleTableSize;
+struct HandleTableSize {
+	uint32 entry_number      : 15;
+	uint32 reserved_1        : 1;
+	uint32 handle_table_size : 10;
+	uint32 reserved_2        : 6;
+};
 
-typedef struct {
-	uint32 MiscFlags_EntryNumber : 16;
-	uint32 MiscFlags_Reserved1   : 1;
-	uint32 MiscFlags_EnableDebug : 1;
-	uint32 MiscFlags_ForceDebug  : 1;
-} MiscFlags;
+struct MiscFlags {
+	uint32 entry_number : 16;
+	uint32 reserved_1   : 1;
+	uint32 enable_debug : 1;
+	uint32 force_debug  : 1;
+	uint32 reserved_2   : 13;
+};
 
-typedef struct {
+struct KcData {
 	descriptor_start = FTell();
-	descriptor_count = parentof(this).kc.size / 0x4;
+	descriptor_count = kc_section_header.size / 0x4;
 	for (i = 0; i < descriptor_count; i++) {
 		descriptor = ReadUInt(descriptor_start + (i * 0x4));
 		entry_number = 0;
-		while (descriptor & 1) {
+		while (descriptor & 0x1) {
 			descriptor >>= 1;
 			entry_number++;
 		}
 		switch (entry_number) {
-			case 3:
+			case EntryNumber_ThreadInfo:
 				ThreadInfo thread_info;
 				break;
-			case 4:
-				index = descriptor >> 25;
+			case EntryNumber_EnableSystemCalls:
+				index = (descriptor >> 25) & 0x7;
 				EnableSystemCalls enable_system_calls;
 				break;
-			case 6:
+			case EntryNumber_MemoryMap:
 				MemoryMap memory_map;
 				break;
-			case 7:
+			case EntryNumber_IoMemoryMap:
 				IoMemoryMap io_memory_map;
 				break;
-			case 10:
+			case EntryNumber_MemoryRegionMap:
 				MemoryRegionMap memory_region_map;
 				break;
-			case 11:
+			case EntryNumber_EnableInterrupts:
 				EnableInterrupts enable_interrupts;
 				break;
-			case 13:
+			case EntryNumber_MiscParams:
 				MiscParams misc_params;
 				break;
-			case 14:
+			case EntryNumber_KernelVersion:
 				KernelVersion kernel_version;
 				break;
-			case 15:
+			case EntryNumber_HandleTableSize:
 				HandleTableSize handle_table_size;
 				break;
-			case 16:
+			case EntryNumber_MiscFlags:
 				MiscFlags misc_flags;
 				break;
 		}
 	}
-} KcData;
+};
 
-FSeek(meta_header.acid.offset);
-offset = meta_header.acid.offset;
-struct {
+FSeek(meta_header.acid_section_header.offset);
+offset = meta_header.acid_section_header.offset;
+struct AcidHeader {
 	ubyte  signature[0x100];
 	ubyte  public_key[0x100];
 	char   magic[0x4];
@@ -427,24 +467,30 @@ struct {
 	AcidFlags flags;
 	uint64 program_id_min;
 	uint64 program_id_max;
-	SectionHeader fac;
-	SectionHeader sac;
-	SectionHeader kc;
+	SectionHeader fac_section_header;
+	SectionHeader sac_section_header;
+	SectionHeader kc_section_header;
 	uint64 reserved_2;
+	FSeek(meta_header.acid_section_header.offset + fac_section_header.offset);
 	FacDescriptor fac_descriptor;
-	FSeek(meta_header.acid.offset + sac.offset);
+	FSeek(meta_header.acid_section_header.offset + sac_section_header.offset);
 	SacData sac_data;
-	FSeek(meta_header.acid.offset + kc.offset);
+	FSeek(meta_header.acid_section_header.offset + kc_section_header.offset);
 	KcData kc_data;
 } acid_header;
 
-typedef enum <ubyte> {
+enum <ubyte> Accessibility {
 	Accessibility_Read      = 1,
 	Accessibility_Write     = 2,
 	Accessibility_ReadWrite = 3
-} Accessibility;
+};
 
-typedef struct {
+uint32 AlignUp(uint32 offset, uint32 alignment) {
+	local uint32 mask = alignment - 1;
+	return (mask + offset) & ~mask;
+}
+
+struct FacData {
 	ubyte  version;
 	ubyte  reserved_1[0x3];
 	FlagPresetsBit flag_presets_bit;
@@ -459,26 +505,27 @@ typedef struct {
 	if (save_data_owner_info_size != 0) {
 		uint32 save_data_owner_id_count;
 		Accessibility accessibilities[save_data_owner_id_count];
-		target = save_data_owner_info_offset + 0x4 + (save_data_owner_id_count * 0x1);
-		ubyte  reserved_2[((target + 0x3) & ~0x3) - target];
+		local uint32 target = startof(accessibilities) + (save_data_owner_id_count * 0x1);
+		ubyte  reserved_2[AlignUp(target, 0x4) - target];
 		uint64 save_data_owner_ids[save_data_owner_id_count];
 	}
-} FacData;
+};
 
-FSeek(meta_header.aci.offset);
-offset = meta_header.aci.offset;
-struct {
+FSeek(meta_header.aci_section_header.offset);
+offset = meta_header.aci_section_header.offset;
+struct AciHeader {
 	char   magic[0x4];
 	ubyte  reserved_1[0xC];
 	uint64 program_id;
 	uint64 reserved_2;
-	SectionHeader fac;
-	SectionHeader sac;
-	SectionHeader kc;
+	SectionHeader fac_section_header;
+	SectionHeader sac_section_header;
+	SectionHeader kc_section_header;
 	uint64 reserved_3;
+	FSeek(meta_header.aci_section_header.offset + fac_section_header.offset);
 	FacData fac_data;
-	FSeek(meta_header.aci.offset + sac.offset);
+	FSeek(meta_header.aci_section_header.offset + sac_section_header.offset);
 	SacData sac_data;
-	FSeek(meta_header.aci.offset + kc.offset);
+	FSeek(meta_header.aci_section_header.offset + kc_section_header.offset);
 	KcData kc_data;
 } aci_header;
