@@ -4,27 +4,27 @@ DisplayFormatHex();
 local uint32 i, rom_file_entry_count;
 local uint64 fs_offset;
 
-typedef struct {
+struct RoCrt {
 	uint32 entry_point;
 	uint32 mod_offset;
-} RoCrt;
+};
 
-struct {
+struct ModStart {
 	RoCrt ro_crt;
 	char  reserved_1[0x8];
 } mod_start;
 
-typedef struct {
+struct SegmentHeader {
 	uint32 memory_offset;
 	uint32 size;
-} SegmentHeader;
+};
 
-typedef struct {
+struct SectionHeader {
 	uint32 offset;
 	uint32 size;
-} SectionHeader;
+};
 
-struct {
+struct NroHeader {
 	char   magic[0x4];
 	uint32 version;
 	uint32 size;
@@ -42,7 +42,7 @@ struct {
 	SectionHeader dyn_sym_section_header;
 } nro_header;
 
-typedef struct {
+struct ModHeader {
 	char   magic[0x4];
 	uint32 dynamic_offset;
 	uint32 bss_start_offset;
@@ -50,24 +50,31 @@ typedef struct {
 	uint32 eh_frame_hdr_start_offset;
 	uint32 eh_frame_hdr_end_offset;
 	uint32 module_object_offset;
-} ModHeader;
+};
 
-typedef struct {
+struct LnyHeader {
 	char   magic[0x4];
 	uint32 got_start_offset;
 	uint32 got_end_offset;
-} LnyHeader;
+};
+
+struct ModuleInfo {
+	uint32 name_length;
+	char   name[name_length];
+};
 
 FSeek(0x0);
-struct {
+struct NroBody {
 	ubyte text_segment[nro_header.text_segment_header.size];
 	ubyte ro_segment[nro_header.ro_segment_header.size];
 	ubyte data_segment[nro_header.data_segment_header.size];
 	FSeek(mod_start.ro_crt.mod_offset);
 	ModHeader mod_header;
-	if (mod_start.reserved_1 == "HOMEBREW") {
+	if (ReadString(FTell(), 0x4) == "LNY0") {
 		LnyHeader lny_header;
 	}
+	FSeek(startof(ro_segment) + 0x4);
+	ModuleInfo module_info;
 	FSeek(startof(ro_segment) + nro_header.embedded_section_header.offset);
 	ubyte embedded_section[nro_header.embedded_section_header.size];
 	FSeek(startof(ro_segment) + nro_header.dyn_str_section_header.offset);
@@ -76,14 +83,14 @@ struct {
 	ubyte dyn_sym_section[nro_header.dyn_sym_section_header.size];
 } nro_body;
 
-if (mod_start.reserved_1 == "HOMEBREW") {
-	typedef struct {
+if (ReadString(nro_header.size, 0x4) == "ASET") {
+	struct AsetSectionHeader {
 		uint64 offset;
 		uint64 size;
-	} AsetSectionHeader;
-	
+	};
+
 	FSeek(nro_header.size);
-	struct {
+	struct AsetHeader {
 		char   magic[0x4];
 		uint32 version;
 		AsetSectionHeader icon_section_header;
@@ -91,33 +98,34 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		AsetSectionHeader romfs_section_header;
 	} aset_header;
 
-	typedef struct {
+	struct Title {
 		ubyte name[0x200];
 		ubyte publisher[0x100];
-	} Title;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> StartupUserAccount {
 		StartupUserAccount_None                                       = 0,
 		StartupUserAccount_Required                                   = 1,
 		StartupUserAccount_RequiredWithNetworkServiceAccountAvailable = 2
-	} StartupUserAccount;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> UserAccountSwitchLock {
 		UserAccountSwitchLock_Disable = 0,
 		UserAccountSwitchLock_Enable  = 1
-	} UserAccountSwitchLock;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> AddOnContentRegistrationType {
 		AddOnContentRegistrationType_AllOnLaunch = 0,
 		AddOnContentRegistrationType_OnDemand    = 1
-	} AddOnContentRegistrationType;
+	};
 
-	typedef struct {
+	struct AttributeFlag {
 		uint32 AttributeFlag_Demo                     : 1;
 		uint32 AttributeFlag_RetailInteractiveDisplay : 1;
-	} AttributeFlag;
+		uint32 AttributeFlag_Reserved1                : 30;
+	};
 
-	typedef struct {
+	struct SupportedLanguageFlag {
 		uint32 SupportedLanguageFlag_AmericanEnglish      : 1;
 		uint32 SupportedLanguageFlag_BritishEnglish       : 1;
 		uint32 SupportedLanguageFlag_Japanese             : 1;
@@ -133,35 +141,38 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		uint32 SupportedLanguageFlag_Korean               : 1;
 		uint32 SupportedLanguageFlag_TraditionalChinese   : 1;
 		uint32 SupportedLanguageFlag_SimplifiedChinese    : 1;
-	} SupportedLanguageFlag;
+		uint32 SupportedLanguageFlag_Reserved1            : 17;
+	};
 
-	typedef struct {
+	struct ParentalControlFlag {
 		uint32 ParentalControlFlag_FreeCommunication : 1;
-	} ParentalControlFlag;
+		uint32 ParentalControlFlag_Reserved1         : 31;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> Screenshot {
 		Screenshot_Allow = 0,
 		Screenshot_Deny  = 1
-	} Screenshot;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> VideoCapture {
 		VideoCapture_Disable = 0,
 		VideoCapture_Manual  = 1,
 		VideoCapture_Enable  = 2
-	} VideoCapture;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> DataLossConfirmation {
 		DataLossConfirmation_None     = 0,
 		DataLossConfirmation_Required = 1
-	} DataLossConfirmation;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> PlayLogPolicy {
 		PlayLogPolicy_All     = 0,
 		PlayLogPolicy_LogOnly = 1,
-		PlayLogPolicy_None    = 2
-	} PlayLogPolicy;
+		PlayLogPolicy_None    = 2,
+		PlayLogPolicy_Unknown = 3  /* Name unknown. */
+	};
 
-	typedef struct {
+	struct RatingAge {
 		ubyte cero;
 		ubyte gracgcrb;
 		ubyte gsrmr;
@@ -176,80 +187,82 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		ubyte oflc;
 		ubyte iarc_generic;
 		ubyte reserved_1[0x13];
-	} RatingAge;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> LogoType {
 		LogoType_LicensedByNintendo    = 0,
 		LogoType_DistributedByNintendo = 1, /* Removed? */
 		LogoType_Nintendo              = 2
-	} LogoType;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> LogoHandling {
 		LogoHandling_Auto   = 0,
 		LogoHandling_Manual = 1
-	} LogoHandling;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> RuntimeAddOnContentInstall {
 		RuntimeAddOnContentInstall_Deny        = 0,
 		RuntimeAddOnContentInstall_AllowAppend = 1
-	} RuntimeAddOnContentInstall;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> RuntimeParameterDelivery {
 		RuntimeParameterDelivery_Always                   = 0,
 		RuntimeParameterDelivery_AlwaysIfUserStateMatched = 1,
 		RuntimeParameterDelivery_OnRestart                = 2
-	} RuntimeParameterDelivery;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> CrashReport {
 		CrashReport_Deny  = 0,
 		CrashReport_Allow = 1
-	} CrashReport;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> Hdcp {
 		Hdcp_None     = 0,
 		Hdcp_Required = 1
-	} Hdcp;
+	};
 
-	typedef struct {
+	struct StartupUserAccountOption {
 		ubyte StartupUserAccountOption_IsOptional : 1;
-	} StartupUserAccountOption;
+		ubyte StartupUserAccountOption_Reserved1  : 7;
+	};
 
-	typedef enum <ubyte> {
+	enum <ubyte> PlayLogQueryCapability {
 		PlayLogQueryCapability_None      = 0,
 		PlayLogQueryCapability_WhiteList = 1,
 		PlayLogQueryCapability_All       = 2
-	} PlayLogQueryCapability;
+	};
 
-	typedef struct {
+	struct RepairFlag {
 		ubyte RepairFlag_SuppressGameCardAccess : 1;
-	} RepairFlag;
+	};
 
-	typedef struct {
-		ubyte RequiredNetworkServiceLicenseOnLaunchFlag_Common : 1;
-	} RequiredNetworkServiceLicenseOnLaunchFlag;
+	struct RequiredNetworkServiceLicenseOnLaunchFlag {
+		ubyte RequiredNetworkServiceLicenseOnLaunchFlag_Common    : 1;
+		ubyte RequiredNetworkServiceLicenseOnLaunchFlag_Reserved1 : 7;
+	};
 
-	typedef struct {
+	struct NeighborDetectionGroupConfiguration {
 		uint64 group_id;
 		ubyte  key[0x10];
-	} NeighborDetectionGroupConfiguration;
+	};
 
-	typedef struct {
+	struct NeighborDetectionClientConfiguration {
 		NeighborDetectionGroupConfiguration send_group_configuration;
 		NeighborDetectionGroupConfiguration receivable_group_configurations[0x10];
-	} NeighborDetectionClientConfiguration;
+	};
 
-	typedef enum <uint64> {
+	enum <uint64> JitConfigurationFlag {
 		JitConfigurationFlag_None    = 0,
 		JitConfigurationFlag_Enabled = 1
-	} JitConfigurationFlag;
+	};
 
-	typedef struct {
+	struct JitConfiguration {
 		JitConfigurationFlag jit_configuration_flag;
 		uint64 memory_size;
-	} JitConfiguration;
+	};
 
-	typedef struct {
-		Title  titles[0x10];
+	struct NintendoApplicationControlProperty {
+		Title  titles[16];
 		char   isbn[0x25];
 		StartupUserAccount startup_user_account;
 		UserAccountSwitchLock user_account_switch_lock; /* Old: touch_screen_usage (None, Supported, Required) */
@@ -272,7 +285,7 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		uint64 device_save_data_journal_size;
 		uint64 bcat_delivery_cache_storage_size;
 		char   application_error_code_category[0x8];
-		uint64 local_communication_ids[0x8];
+		uint64 local_communication_ids[8];
 		LogoType logo_type;
 		LogoHandling logo_handling;
 		RuntimeAddOnContentInstall runtime_add_on_content_install;
@@ -294,7 +307,7 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		uint64 cache_storage_data_and_journal_size_max;
 		uint16 cache_storage_index_max;
 		ubyte  reserved_3[0x6];
-		uint64 play_log_queryable_application_ids[0x10];
+		uint64 play_log_queryable_application_ids[16];
 		PlayLogQueryCapability play_log_query_capability;
 		RepairFlag repair_flag;
 		ubyte  program_index;
@@ -303,9 +316,9 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		NeighborDetectionClientConfiguration neighbor_detection_client_configuration;
 		JitConfiguration jit_configuration;
 		ubyte  reserved_5[0xC40];
-	} Nacp;
+	};
 	
-	typedef struct {
+	struct RomFileSystemInformation {
 		uint64 header_size;
 		uint64 directory_bucket_offset;
 		uint64 directory_bucket_size;
@@ -316,35 +329,35 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 		uint64 file_entry_offset;
 		uint64 file_entry_size;
 		uint64 body_offset;
-	} RomFileSystemInformation;
+	};
 	
-	typedef struct {
+	struct RomDirectoryEntry {
 		uint32 parent_offset;
 		uint32 next_offset;
 		uint32 directory_offset;
 		uint32 file_offset;
-		uint32 hash_offset;
+		uint32 bucket_offset;
 		uint32 name_length;
 		char   name[name_length];
 		ubyte  reserved_1[(name_length + 0x1B & -0x4) - (0x18 + name_length)];
-	} RomDirectoryEntry;
+	};
 	
-	typedef struct {
+	struct RomFileEntry {
 		uint32 parent_offset;
 		uint32 next_offset;
 		uint64 offset;
 		uint64 size;
-		uint32 hash_offset;
+		uint32 bucket_offset;
 		uint32 name_length;
 		char   name[name_length];
 		ubyte  reserved_1[(name_length + 0x23 & -0x4) - (0x20 + name_length)];
-	} RomFileEntry;
+	};
 	
-	typedef struct {
+	struct RomFileData {
 		ubyte data[rom_file_entry[i].size];
-	} RomFileData;
+	};
 	
-	typedef struct {
+	struct RomFileSystem {
 		fs_offset = nro_header.size + aset_header.romfs_section_header.offset;
 		RomFileSystemInformation rom_file_system_information;
 		FSeek(fs_offset + rom_file_system_information.directory_bucket_offset);
@@ -364,11 +377,11 @@ if (mod_start.reserved_1 == "HOMEBREW") {
 			FSeek(fs_offset + rom_file_system_information.body_offset + rom_file_entry[i].offset);
 			RomFileData rom_file_data;
 		}
-	} RomFileSystem;
+	};
 	
-	struct {
-		ubyte icon[aset_header.icon_section_header.size];
-		Nacp  nacp;
+	struct AsetBody {
+		ubyte icon[aset_header.icon_section_header.size]; /* Add JPEG format reading? */
+		NintendoApplicationControlProperty nintendo_application_control_property;
 		if (aset_header.romfs_section_header.size != 0) {
 			RomFileSystem rom_file_system;
 		}
