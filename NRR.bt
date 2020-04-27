@@ -1,20 +1,20 @@
 LittleEndian();
 DisplayFormatHex();
 
-typedef struct {
+struct Certification {
 	uint64 application_id_mask;
 	uint64 application_id_pattern;
 	ubyte  reserved_1[0x10];
 	ubyte  public_key[0x100];
 	ubyte  signature[0x100];
-} Certification;
+};
 
-typedef enum <ubyte> {
+enum <ubyte> NrrKind {
 	NrrKind_User      = 0,
 	NrrKind_JitPlugin = 1
-} NrrKind;
+};
 
-struct {
+struct NrrHeader {
 	char   magic[0x4];
 	ubyte  signature_key_generation; /* certification.signature */
 	ubyte  reserved_1[0xB];
@@ -29,6 +29,6 @@ struct {
 	uint64 reserved_3;
 } nrr_header;
 
-struct {
-	ubyte hash[0x20];
+struct NroHashList {
+	ubyte nro_hash[0x20];
 } nro_hash_list[nrr_header.hash_count];
