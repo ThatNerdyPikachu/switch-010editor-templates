@@ -2,7 +2,7 @@ LittleEndian();
 DisplayFormatHex();
 /* BitfieldDisablePadding(); */
 
-local uint32 offset, i, descriptor_start, descriptor_count, descriptor, index;
+local uint32 i, descriptor_start, descriptor_count, descriptor, entry_number, index;
 local ubyte  current_page;
 
 enum <uint32> EntryNumber {
@@ -17,8 +17,6 @@ enum <uint32> EntryNumber {
 	EntryNumber_HandleTableSize   = 15,
 	EntryNumber_MiscFlags         = 16
 };
-
-local EntryNumber entry_number;
 
 enum <ubyte> ProcessAddressSpace {
 	ProcessAddressSpace_AddressSpace32Bit           = 0,
@@ -48,8 +46,8 @@ struct SectionHeader {
 };
 
 struct MetaHeader {
-	char   magic[0x4];
-	ubyte  signature_key_generation; /* acid_header.signature */
+	char   signature[0x4];
+	ubyte  signature_key_generation; /* acid_header.sign */
 	ubyte  reserved_1[0x7];
 	MetaFlags flags;
 	ubyte  reserved_2;
@@ -117,7 +115,7 @@ struct FlagPresetsBit {
 	uint64 FlagPresetsBit_SaveDataTransferVersion2    : 1;
 	uint64 FlagPresetsBit_RegisterProgramIndexMapInfo : 1;
 	uint64 FlagPresetsBit_CreateOwnSaveData           : 1;
-	uint64 FlagPresetsBit_Unknown1                    : 1;  /* Name unknown. */
+	uint64 FlagPresetsBit_MoveCacheStorage            : 1;
 	uint64 FlagPresetsBit_Reserved1                   : 25;
 	uint64 FlagPresetsBit_Debug                       : 1;
 	uint64 FlagPresetsBit_FullPermission              : 1;
@@ -133,8 +131,8 @@ struct FacDescriptor {
 	uint64 content_owner_id_max;
 	uint64 save_data_owner_id_min;
 	uint64 save_data_owner_id_max;
-	uint64 content_owner_ids[content_owner_id_count];
-	uint64 save_data_owner_ids[save_data_owner_id_count];
+	uint64 content_owner_id[content_owner_id_count];
+	uint64 save_data_owner_id[save_data_owner_id_count];
 };
 
 struct Descriptor {
@@ -148,8 +146,8 @@ struct SacEntry {
 	char name[descriptor.Descriptor_NameLength + 1];
 };
 
-struct SacData {
-	while (FTell() < (offset + sac_section_header.offset + sac_section_header.size)) {
+struct SacData(uint32 end_offset) {
+	while (FTell() < end_offset) {
 		SacEntry sac_entry;
 	}
 };
@@ -410,12 +408,10 @@ struct MiscFlags {
 	uint32 reserved_2   : 13;
 };
 
-struct KcData {
+struct KcData(uint32 descriptor_count) {
 	descriptor_start = FTell();
-	descriptor_count = kc_section_header.size / 0x4;
 	for (i = 0; i < descriptor_count; i++) {
 		descriptor = ReadUInt(descriptor_start + (i * 0x4));
-		entry_number = 0;
 		while (descriptor & 0x1) {
 			descriptor >>= 1;
 			entry_number++;
@@ -453,15 +449,15 @@ struct KcData {
 				MiscFlags misc_flags;
 				break;
 		}
+		entry_number = 0;
 	}
 };
 
 FSeek(meta_header.acid_section_header.offset);
-offset = meta_header.acid_section_header.offset;
 struct AcidHeader {
-	ubyte  signature[0x100];
+	ubyte  sign[0x100];
 	ubyte  public_key[0x100];
-	char   magic[0x4];
+	char   signature[0x4];
 	uint32 size;
 	uint32 reserved_1;
 	AcidFlags flags;
@@ -471,24 +467,27 @@ struct AcidHeader {
 	SectionHeader sac_section_header;
 	SectionHeader kc_section_header;
 	uint64 reserved_2;
-	FSeek(meta_header.acid_section_header.offset + fac_section_header.offset);
-	FacDescriptor fac_descriptor;
-	FSeek(meta_header.acid_section_header.offset + sac_section_header.offset);
-	SacData sac_data;
-	FSeek(meta_header.acid_section_header.offset + kc_section_header.offset);
-	KcData kc_data;
 } acid_header;
+
+uint32 AlignUp(uint32 target, uint32 alignment) {
+	local uint32 mask = alignment - 1;
+	return (mask + target) & ~mask;
+}
+
+struct AcidBody {
+	FacDescriptor fac_descriptor;
+	ubyte reserved_1[AlignUp(acid_header.fac_section_header.size, 0x10) - acid_header.fac_section_header.size];
+	SacData sac_data(meta_header.acid_section_header.offset + acid_header.sac_section_header.offset + acid_header.sac_section_header.size);
+	ubyte reserved_2[AlignUp(acid_header.sac_section_header.size, 0x10) - acid_header.sac_section_header.size];
+	KcData kc_data(acid_header.kc_section_header.size / 0x4);
+	ubyte reserved_3[AlignUp(acid_header.kc_section_header.size, 0x10) - acid_header.kc_section_header.size];
+} acid_body;
 
 enum <ubyte> Accessibility {
 	Accessibility_Read      = 1,
 	Accessibility_Write     = 2,
 	Accessibility_ReadWrite = 3
 };
-
-uint32 AlignUp(uint32 offset, uint32 alignment) {
-	local uint32 mask = alignment - 1;
-	return (mask + offset) & ~mask;
-}
 
 struct FacData {
 	ubyte  version;
@@ -500,21 +499,19 @@ struct FacData {
 	uint32 save_data_owner_info_size;
 	if (content_owner_info_size != 0) {
 		uint32 content_owner_id_count;
-		uint64 content_owner_ids[content_owner_id_count];
+		uint64 content_owner_id[content_owner_id_count];
 	}
 	if (save_data_owner_info_size != 0) {
 		uint32 save_data_owner_id_count;
-		Accessibility accessibilities[save_data_owner_id_count];
-		local uint32 target = startof(accessibilities) + (save_data_owner_id_count * 0x1);
-		ubyte  reserved_2[AlignUp(target, 0x4) - target];
-		uint64 save_data_owner_ids[save_data_owner_id_count];
+		Accessibility accessibility[save_data_owner_id_count];
+		ubyte  reserved_2[AlignUp(FTell(), 0x4) - FTell()];
+		uint64 save_data_owner_id[save_data_owner_id_count];
 	}
 };
 
 FSeek(meta_header.aci_section_header.offset);
-offset = meta_header.aci_section_header.offset;
 struct AciHeader {
-	char   magic[0x4];
+	char   signature[0x4];
 	ubyte  reserved_1[0xC];
 	uint64 program_id;
 	uint64 reserved_2;
@@ -522,10 +519,12 @@ struct AciHeader {
 	SectionHeader sac_section_header;
 	SectionHeader kc_section_header;
 	uint64 reserved_3;
-	FSeek(meta_header.aci_section_header.offset + fac_section_header.offset);
-	FacData fac_data;
-	FSeek(meta_header.aci_section_header.offset + sac_section_header.offset);
-	SacData sac_data;
-	FSeek(meta_header.aci_section_header.offset + kc_section_header.offset);
-	KcData kc_data;
 } aci_header;
+
+struct AciBody {
+	FacData fac_data;
+	ubyte reserved_1[AlignUp(aci_header.fac_section_header.size, 0x10) - aci_header.fac_section_header.size];
+	SacData sac_data(meta_header.aci_section_header.offset + aci_header.sac_section_header.offset + aci_header.sac_section_header.size);
+	ubyte reserved_2[AlignUp(aci_header.sac_section_header.size, 0x10) - aci_header.sac_section_header.size];
+	KcData kc_data(aci_header.kc_section_header.size / 0x4);
+} aci_body;
