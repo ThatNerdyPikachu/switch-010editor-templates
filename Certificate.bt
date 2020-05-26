@@ -2,61 +2,78 @@ BigEndian();
 DisplayFormatHex();
 
 enum <uint32> SigType {
-	SigType_Rsa4096Sha1    = 65536,
-	SigType_Rsa2048Sha1    = 65537,
-	SigType_Ecsda240Sha1   = 65538,
-	SigType_Rsa4096Sha256  = 65539,
-	SigType_Rsa2048Sha256  = 65540,
-	SigType_Ecsda240Sha256 = 65541
+	SigType_Rsa4096Sha1   = 65536,
+	SigType_Rsa2048Sha1   = 65537,
+	SigType_Ecc480Sha1    = 65538,
+	SigType_Rsa4096Sha256 = 65539,
+	SigType_Rsa2048Sha256 = 65540,
+	SigType_Ecc480Sha256  = 65541,
+	SigType_Hmac160Sha1   = 65542
 };
 
 enum <uint32> PubKeyType {
-	PubKeyType_Rsa4096   = 0,
-	PubKeyType_Rsa2048   = 1,
-	PubKeyType_Ecsda240  = 2
+	PubKeyType_Rsa4096 = 0,
+	PubKeyType_Rsa2048 = 1,
+	PubKeyType_Ecc480  = 2
 };
 
-struct Certificate {
+struct SignatureBlock {
 	SigType sig_type;
 	switch (sig_type) {
 		case SigType_Rsa4096Sha1:
 		case SigType_Rsa4096Sha256:
-			ubyte signature[0x200];
+			ubyte sign[0x200];
 			ubyte reserved_1[0x3C];
 			break;
 		case SigType_Rsa2048Sha1:
 		case SigType_Rsa2048Sha256:
-			ubyte signature[0x100];
+			ubyte sign[0x100];
 			ubyte reserved_1[0x3C];
 			break;
-		case SigType_Ecsda240Sha1:
-		case SigType_Ecsda240Sha256:
-			ubyte signature[0x3C];
+		case SigType_Ecc480Sha1:
+		case SigType_Ecc480Sha256:
+			ubyte sign[0x3C];
 			ubyte reserved_1[0x40];
 			break;
+		case SigType_Hmac160Sha1:
+			ubyte sign[0x14];
+			ubyte reserved_1[0x18];
+			break;
 	}
-	char   issuer[0x40];
+	char issuer[0x40];
+};
+
+struct CertHeader {
 	PubKeyType pub_key_type;
-	char   subject[0x40];
-	uint32 cert_id;
-	switch (pub_key_type) {
+	char   subject[0x40]; /* ServerId, DeviceId */
+	uint32 date;
+};
+
+struct PublicKeyBlock {
+	switch (cert_header.pub_key_type) {
 		case PubKeyType_Rsa4096:
 			ubyte  public_key[0x200];
 			uint32 public_exponent;
-			ubyte  reserved_2[0x34];
+			ubyte  reserved_1[0x34];
 			break;
 		case PubKeyType_Rsa2048:
 			ubyte  public_key[0x100];
 			uint32 public_exponent;
-			ubyte  reserved_2[0x34];
+			ubyte  reserved_1[0x34];
 			break;
-		case PubKeyType_Ecsda240:
+		case PubKeyType_Ecc480:
 			ubyte  public_key[0x3C];
-			ubyte  reserved_2[0x3C];
+			ubyte  reserved_1[0x3C];
 			break;
 	}
-} certificate;
+};
+
+struct Cert {
+	SignatureBlock signature_block;
+	CertHeader cert_header;
+	PublicKeyBlock public_key_block;
+};
 
 while (FTell() < FileSize()) {
-	Certificate certificate;
+	Cert cert;
 }
