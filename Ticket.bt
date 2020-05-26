@@ -4,12 +4,39 @@ DisplayFormatHex();
 local uint32 i, j;
 
 enum <uint32> SigType {
-	SigType_Rsa4096Sha1    = 65536,
-	SigType_Rsa2048Sha1    = 65537,
-	SigType_Ecsda240Sha1   = 65538,
-	SigType_Rsa4096Sha256  = 65539,
-	SigType_Rsa2048Sha256  = 65540,
-	SigType_Ecsda240Sha256 = 65541
+	SigType_Rsa4096Sha1   = 65536,
+	SigType_Rsa2048Sha1   = 65537,
+	SigType_Ecc480Sha1    = 65538,
+	SigType_Rsa4096Sha256 = 65539,
+	SigType_Rsa2048Sha256 = 65540,
+	SigType_Ecc480Sha256  = 65541,
+	SigType_Hmac160Sha1   = 65542
+};
+
+struct SignatureBlock {
+	SigType sig_type;
+	switch (sig_type) {
+		case SigType_Rsa4096Sha1:
+		case SigType_Rsa4096Sha256:
+			ubyte sign[0x200];
+			ubyte reserved_1[0x3C];
+			break;
+		case SigType_Rsa2048Sha1:
+		case SigType_Rsa2048Sha256:
+			ubyte sign[0x100];
+			ubyte reserved_1[0x3C];
+			break;
+		case SigType_Ecsda480Sha1:
+		case SigType_Ecsda480Sha256:
+			ubyte sign[0x3C];
+			ubyte reserved_1[0x40];
+			break;
+		case SigType_Hmac160Sha1:
+			ubyte sign[0x14];
+			ubyte reserved_1[0x28];
+			break;
+	}
+	char issuer[0x40];
 };
 
 enum <ubyte> TitleKeyType {
@@ -27,13 +54,13 @@ enum <ubyte> LicenseType {
 };
 
 struct PropertyMask {
-	ubyte PropertyMask_PreInstallation       : 1;
-	ubyte PropertyMask_SharedTitle           : 1;
-	ubyte PropertyMask_AllContents           : 1;
-	ubyte PropertyMask_DeviceLinkIndependent : 1;
-	ubyte PropertyMask_Volatile              : 1;
-	ubyte PropertyMask_ELicenseRequired      : 1;
-	ubyte PropertyMask_Reserved1             : 2;
+	uint16 PropertyMask_PreInstallation       : 1;
+	uint16 PropertyMask_SharedTitle           : 1;
+	uint16 PropertyMask_AllContents           : 1;
+	uint16 PropertyMask_DeviceLinkIndependent : 1;
+	uint16 PropertyMask_Volatile              : 1;
+	uint16 PropertyMask_ELicenseRequired      : 1;
+	uint16 PropertyMask_Reserved1             : 10;
 };
 
 enum <uint16> SectionType {
@@ -45,41 +72,71 @@ enum <uint16> SectionType {
 	SectionType_LimitedResource    = 6
 };
 
-struct Esv1SectionTypeRecord {
-	ubyte record[record_size];
+struct ESV1PermanentRecord {
+	ubyte  ref_id[0x10];
+	uint32 ref_id_attr;
 };
 
-struct Esv2SectionRecord {
+struct ESV1SubscriptionRecord {
+	uint32 limit;
+	ubyte  ref_id[0x10];
+	uint32 ref_id_attr;
+};
+
+struct ESV1ContentRecord {
+	uint32 offset;
+	ubyte  access_mask[0x80];
+};
+
+struct ESV1ContentConsumptionRecord {
+	uint16 index;
+	uint16 code;
+	uint32 limit;
+};
+
+struct ESV1AccessTitleRecord {
+	uint64 access_title_id;
+	uint64 access_title_mask;
+};
+
+struct ESV1LimitedResourceRecord {
+	uint32 limit;
+	ubyte  ref_id[0x10];
+	uint32 ref_id_attr;
+};
+
+struct ESV2SectionRecord {
 	uint32 sect_offset;
 	uint32 record_size;
 	uint32 section_size;
 	uint16 records; /* record_count */
 	SectionType section_type;
 	for (j = 0; j < records; j++) {
-		Esv1SectionTypeRecord esv1_section_type_record; /* Placeholder */
+		switch (section_type) {
+			case SectionType_Permanent:
+				ESV1PermanentRecord es_v1_permanent_record;
+				break;
+			case SectionType_Subscription:
+				ESV1SubscriptionRecord es_v1_subscription_record;
+				break;
+			case SectionType_Content:
+				ESV1ContentRecord es_v1_content_record;
+				break;
+			case SectionType_ContentConsumption:
+				ESV1ContentConsumptionRecord es_v1_content_consumption_record;
+				break;
+			case SectionType_AccessTitle:
+				ESV1AccessTitleRecord es_v1_access_title_record;
+				break;
+			case SectionType_LimitedResource:
+				ESV1LimitedResourceRecord es_v1_limited_resource_record;
+				break;
+		}
 	}
 };
 
 struct Ticket {
-	SigType sig_type;
-	switch (sig_type) {
-		case SigType_Rsa4096Sha1:
-		case SigType_Rsa4096Sha256:
-			ubyte signature[0x200];
-			ubyte reserved_1[0x3C];
-			break;
-		case SigType_Rsa2048Sha1:
-		case SigType_Rsa2048Sha256:
-			ubyte signature[0x100];
-			ubyte reserved_1[0x3C];
-			break;
-		case SigType_Ecsda240Sha1:
-		case SigType_Ecsda240Sha256:
-			ubyte signature[0x3C];
-			ubyte reserved_1[0x40];
-			break;
-	}
-	char   issuer[0x40];
+	SignatureBlock signature_block;
 	ubyte  title_key[0x100];
 	ubyte  format_version;
 	TitleKeyType title_key_type;
@@ -87,7 +144,7 @@ struct Ticket {
 	LicenseType license_type;
 	ubyte  common_key_id; /* key_generation */
 	PropertyMask property_mask;
-	ubyte  reserved_2[0x9];
+	uint64 reserved_2;
 	uint64 ticket_id;
 	uint64 device_id;
 	ubyte  rights_id[0x10];
@@ -97,10 +154,48 @@ struct Ticket {
 	uint16 sect_hdrs; /* sect_hdr_count */
 	uint16 sect_hdr_entry_size;
 	for (i = 0; i < sect_hdrs; i++) {
-		Esv2SectionRecord esv2_section_records;
+		ESV2SectionRecord es_v2_section_records;
+	}
+} ticket;
+
+enum <uint32> PubKeyType {
+	PubKeyType_Rsa4096 = 0,
+	PubKeyType_Rsa2048 = 1,
+	PubKeyType_Ecc480  = 2
+};
+
+struct CertHeader {
+	PubKeyType pub_key_type;
+	char   subject[0x40]; /* ServerId, DeviceId */
+	uint32 date;
+};
+
+struct PublicKeyBlock {
+	switch (cert_header.pub_key_type) {
+		case PubKeyType_Rsa4096:
+			ubyte  public_key[0x200];
+			uint32 public_exponent;
+			ubyte  reserved_1[0x34];
+			break;
+		case PubKeyType_Rsa2048:
+			ubyte  public_key[0x100];
+			uint32 public_exponent;
+			ubyte  reserved_1[0x34];
+			break;
+		case PubKeyType_Ecc480:
+			ubyte  public_key[0x3C];
+			ubyte  reserved_1[0x3C];
+			break;
 	}
 };
 
+struct Cert {
+	SignatureBlock signature_block;
+	CertHeader cert_header;
+	PublicKeyBlock public_key_block;
+};
+
+BigEndian();
 while (FTell() < FileSize()) {
-	Ticket ticket;
+	Cert cert;
 }
