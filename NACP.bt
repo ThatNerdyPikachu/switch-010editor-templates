@@ -42,8 +42,8 @@ struct SupportedLanguageFlag {
 	uint32 SupportedLanguageFlag_Portuguese           : 1;
 	uint32 SupportedLanguageFlag_Russian              : 1;
 	uint32 SupportedLanguageFlag_Korean               : 1;
-	uint32 SupportedLanguageFlag_TraditionalChinese   : 1;
-	uint32 SupportedLanguageFlag_SimplifiedChinese    : 1;
+	uint32 SupportedLanguageFlag_TraditionalChinese   : 1;  /* Old: SupportedLanguageFlag_Taiwanese */
+	uint32 SupportedLanguageFlag_SimplifiedChinese    : 1;  /* Old: SupportedLanguageFlag_Chinese */
 	uint32 SupportedLanguageFlag_Reserved1            : 17;
 };
 
@@ -60,7 +60,11 @@ enum <ubyte> Screenshot {
 enum <ubyte> VideoCapture {
 	VideoCapture_Disable = 0,
 	VideoCapture_Manual  = 1,
-	VideoCapture_Enable  = 2
+	VideoCapture_Enable  = 2,
+	
+	/* Old */
+	VideoCapture_Deny    = VideoCapture_Disable,
+	VideoCapture_Allow   = VideoCapture_Manual
 };
 
 enum <ubyte> DataLossConfirmation {
@@ -69,10 +73,13 @@ enum <ubyte> DataLossConfirmation {
 };
 
 enum <ubyte> PlayLogPolicy {
-	PlayLogPolicy_All      = 0,
-	PlayLogPolicy_LogOnly  = 1,
-	PlayLogPolicy_None     = 2,
-	PlayLogPolicy_Unknown1 = 3  /* Name unknown. */
+	PlayLogPolicy_Open    = 0,
+	PlayLogPolicy_LogOnly = 1,
+	PlayLogPolicy_None    = 2,
+	PlayLogPolicy_Closed  = 3,
+	
+	/* Old */
+	PlayLogPolicy_All     = PlayLogPolicy_Open
 };
 
 struct RatingAge {
@@ -94,7 +101,7 @@ struct RatingAge {
 
 enum <ubyte> LogoType {
 	LogoType_LicensedByNintendo    = 0,
-	LogoType_DistributedByNintendo = 1, /* Removed? */
+	LogoType_DistributedByNintendo = 1, /* Removed */
 	LogoType_Nintendo              = 2
 };
 
@@ -104,8 +111,9 @@ enum <ubyte> LogoHandling {
 };
 
 enum <ubyte> RuntimeAddOnContentInstall {
-	RuntimeAddOnContentInstall_Deny        = 0,
-	RuntimeAddOnContentInstall_AllowAppend = 1
+	RuntimeAddOnContentInstall_Deny                                       = 0,
+	RuntimeAddOnContentInstall_AllowAppend                                = 1,
+	RuntimeAddOnContentInstall_AllowAppendButDontDownloadWhenUsingNetwork = 2,
 };
 
 enum <ubyte> RuntimeParameterDelivery {
@@ -151,7 +159,7 @@ struct NeighborDetectionGroupConfiguration {
 
 struct NeighborDetectionClientConfiguration {
 	NeighborDetectionGroupConfiguration send_group_configuration;
-	NeighborDetectionGroupConfiguration receivable_group_configurations[0x10];
+	NeighborDetectionGroupConfiguration receivable_group_configurations[16];
 };
 
 enum <uint64> JitConfigurationFlag {
@@ -164,8 +172,32 @@ struct JitConfiguration {
 	uint64 memory_size;
 };
 
+struct Descriptors {
+	uint16 Descriptors_Index       : 15;
+	uint16 Descriptors_ContinueSet : 1;
+};
+
+struct RequiredAddOnContentsSetBinaryDescriptor {
+	Descriptors descriptors[32];
+};
+
+enum <ubyte> PlayReportPermission {
+	PlayReportPermission_None            = 0,
+	PlayReportPermission_TargetMarketing = 1
+};
+
+enum <ubyte> CrashScreenshotForProd {
+	CrashScreenshotForProd_Deny  = 0,
+	CrashScreenshotForProd_Allow = 1
+};
+
+enum <ubyte> CrashScreenshotForDev {
+	CrashScreenshotForDev_Deny  = 0,
+	CrashScreenshotForDev_Allow = 1
+};
+
 struct NintendoApplicationControlProperty {
-	Title  titles[16];
+	Title  title[16];
 	char   isbn[0x25];
 	StartupUserAccount startup_user_account;
 	UserAccountSwitchLock user_account_switch_lock; /* Old: touch_screen_usage (None, Supported, Required) */
@@ -178,7 +210,7 @@ struct NintendoApplicationControlProperty {
 	DataLossConfirmation data_loss_confirmation;
 	PlayLogPolicy play_log_policy;
 	uint64 presence_group_id;
-	RatingAge rating_ages;
+	RatingAge rating_age;
 	char   display_version[0x10];
 	uint64 add_on_content_base_id;
 	uint64 save_data_owner_id;
@@ -188,7 +220,7 @@ struct NintendoApplicationControlProperty {
 	uint64 device_save_data_journal_size;
 	uint64 bcat_delivery_cache_storage_size;
 	char   application_error_code_category[0x8];
-	uint64 local_communication_ids[8];
+	uint64 local_communication_id[8];
 	LogoType logo_type;
 	LogoHandling logo_handling;
 	RuntimeAddOnContentInstall runtime_add_on_content_install;
@@ -210,7 +242,7 @@ struct NintendoApplicationControlProperty {
 	uint64 cache_storage_data_and_journal_size_max;
 	uint16 cache_storage_index_max;
 	ubyte  reserved_3[0x6];
-	uint64 play_log_queryable_application_ids[16];
+	uint64 play_log_queryable_application_id[16];
 	PlayLogQueryCapability play_log_query_capability;
 	RepairFlag repair_flag;
 	ubyte  program_index;
@@ -218,5 +250,9 @@ struct NintendoApplicationControlProperty {
 	uint32 reserved_4;
 	NeighborDetectionClientConfiguration neighbor_detection_client_configuration;
 	JitConfiguration jit_configuration;
-	ubyte  reserved_5[0xC40];
+	RequiredAddOnContentsSetBinaryDescriptor required_add_on_contents_set_binary_descriptor;
+	PlayReportPermission play_report_permission;
+	CrashScreenshotForProd crash_screenshot_for_prod;
+	CrashScreenshotForDev crash_screenshot_for_dev;
+	ubyte  reserved_5[0xBFD];
 } nintendo_application_control_property;
