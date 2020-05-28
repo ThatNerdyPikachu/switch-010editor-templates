@@ -37,7 +37,7 @@ struct SignatureBlock {
 			break;
 		case SigType_Hmac160Sha1:
 			ubyte sign[0x14];
-			ubyte reserved_1[0x18];
+			ubyte reserved_1[0x28];
 			break;
 	}
 	char issuer[0x40];
